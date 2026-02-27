@@ -6,8 +6,8 @@ RD Checker consists of:
 
 ## Current Versions
 
-- Extension version: `1.1.4`
-- Native updater version: `1.1.4`
+- Extension version: `1.1.5`
+- Native updater version: `1.1.5`
 
 ## Updater Package Policy
 
@@ -21,8 +21,8 @@ No version-suffixed updater package files are kept in `updater/`.
 
 When you run `RD-Checker-Updater-Setup.exe`:
 
-1. It checks GitHub Release API.
-2. If no release asset is available, it uses `updater/update-manifest.json`.
+1. It checks GitHub Release API and `updater/update-manifest.json`.
+2. It compares both sources and uses the higher version package.
 3. It downloads update package into `%TEMP%\\RDCheckerUpdater`.
 4. If the package is `.exe`, it auto-replaces itself and restarts from installed path.
 5. If an old updater launches from temp, it promotes itself back to installed path automatically.

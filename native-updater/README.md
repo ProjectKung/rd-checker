@@ -8,8 +8,8 @@ Windows Forms updater executable for RD Checker.
 
 ## Runtime Flow
 
-1. App checks latest package from GitHub Release API.
-2. If no release asset is found, app falls back to `updater/update-manifest.json`.
+1. App checks latest package from GitHub Release API and `updater/update-manifest.json`.
+2. App compares both sources and selects the higher version package.
 3. App downloads package to `%TEMP%\RDCheckerUpdater`.
 4. If package is `.exe`, app schedules self-replace and restarts from original path.
 5. If started from temp (legacy flow), app promotes itself back to installed path automatically.

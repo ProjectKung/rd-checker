@@ -1,13 +1,13 @@
 {
-  "version": "1.1.4",
+  "version": "1.1.5",
   "release_date": "2026-02-27",
   "package_name": "RD-Checker-Updater-Setup.exe",
-  "package_url": "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/RD-Checker-Updater-Setup.exe",
+  "package_url": "https://raw.githubusercontent.com/ProjectKung/rd-checker/HEAD/updater/RD-Checker-Updater-Setup.exe",
   "package_size": "auto",
   "notes": [
-    "Release 1.1.4: cache-busting for immediate updates.",
-    "Updater auto-replaces its own EXE and restarts automatically.",
-    "Fallback manifest points to a single fixed executable package name."
+    "Release 1.1.5: resolve updates from both Release API and manifest, then pick highest version.",
+    "Manifest and package URLs now use HEAD to reduce stale main-branch cache responses.",
+    "Updater keeps self-replace and auto-restart behavior with single fixed executable package name."
   ]
 }
 

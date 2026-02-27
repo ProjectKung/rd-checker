@@ -165,9 +165,9 @@ namespace RDCheckerNativeUpdater
 
     internal sealed class UpdaterForm : Form
     {
-        private const string CurrentVersion = "1.1.4";
+        private const string CurrentVersion = "1.1.5";
         private const string ReleaseApiUrl = "https://api.github.com/repos/ProjectKung/rd-checker/releases/latest";
-        private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/update-manifest.json";
+        private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/HEAD/updater/update-manifest.json";
 
         private Panel _titleBar;
         private Label _titleLabel;
@@ -411,11 +411,41 @@ namespace RDCheckerNativeUpdater
         private async Task<UpdatePackage> ResolveUpdatePackageAsync()
         {
             UpdatePackage fromRelease = await TryResolveFromGithubReleaseAsync();
-            if (fromRelease != null)
+            UpdatePackage fromManifest = null;
+            Exception manifestError = null;
+
+            try
+            {
+                fromManifest = await TryResolveFromManifestAsync();
+            }
+            catch (Exception ex)
+            {
+                manifestError = ex;
+            }
+
+            if (fromRelease == null && fromManifest == null)
+            {
+                if (manifestError != null)
+                {
+                    throw manifestError;
+                }
+
+                throw new InvalidOperationException("Unable to resolve update package.");
+            }
+
+            if (fromRelease == null)
+            {
+                return fromManifest;
+            }
+
+            if (fromManifest == null)
             {
                 return fromRelease;
             }
-            return await TryResolveFromManifestAsync();
+
+            return CompareVersions(fromManifest.Version, fromRelease.Version) >= 0
+                ? fromManifest
+                : fromRelease;
         }
 
         private async Task<UpdatePackage> TryResolveFromGithubReleaseAsync()

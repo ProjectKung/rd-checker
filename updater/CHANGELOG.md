@@ -1,5 +1,10 @@
 # RD Checker Changelog
 
+## 1.1.5 - 2026-02-27
+- Changed updater manifest source to `.../HEAD/updater/update-manifest.json` to avoid stale `main` cache.
+- Updater now resolves package from both GitHub Release API and manifest, then chooses the higher version.
+- Updated package URL in manifest to `.../HEAD/updater/RD-Checker-Updater-Setup.exe`.
+
 ## 1.1.4 - 2026-02-27
 - Added cache-busting query parameters for update checks and package downloads.
 - Added no-cache HTTP headers in updater WebClient to reduce stale CDN responses.
