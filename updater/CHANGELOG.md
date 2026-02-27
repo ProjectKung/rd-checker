@@ -1,5 +1,9 @@
 # RD Checker Changelog
 
+## 1.1.12 - 2026-02-27
+- Version bump to `1.1.12`.
+- Repository cleanup for non-runtime temporary artifacts.
+
 ## 1.1.11 - 2026-02-27
 - Merged pending working-tree updates into release.
 - Bumped extension/updater version to `1.1.11`.
