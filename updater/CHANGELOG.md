@@ -1,5 +1,10 @@
 # RD Checker Changelog
 
+## 1.1.8 - 2026-02-27
+- Forced popup startup mode to "เช็คทั้งหมด" in runtime JavaScript.
+- Fixed cases where old mode still appeared selected after update.
+- Bumped extension/updater release to `1.1.8`.
+
 ## 1.1.7 - 2026-02-27
 - Changed RD Checker popup default mode to "เช็คทั้งหมด" (`checkModeAll`).
 - Updated updater build note text for this release.

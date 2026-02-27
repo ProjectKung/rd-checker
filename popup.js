@@ -3366,6 +3366,12 @@
     const compareSection = document.getElementById('compareSection');
     const messagesEl = document.getElementById('messages');
 
+    // Force the popup to always start from "ALL" mode on open.
+    allRadio.checked = true;
+    singleRadio.checked = false;
+    if (ipPhoneRadio) ipPhoneRadio.checked = false;
+    if (pdfCheckRadio) pdfCheckRadio.checked = false;
+
     const apply = () => {
       const isAll = !!allRadio.checked;
       const isIpPhone = !!(ipPhoneRadio && ipPhoneRadio.checked);
