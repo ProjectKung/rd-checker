@@ -25,3 +25,13 @@ Generate a release ZIP:
 Then upload the generated file in `dist/` and update:
 - `updater/update-manifest.json` (`version`, `package_name`, `package_url`)
 - `updater/CHANGELOG.md`
+
+## Build as .exe (Windows)
+If you want updater as executable:
+
+1. Go to `updater-desktop`
+2. Install packages: `npm install`
+3. Build exe: `npm run build:win`
+
+Output:
+- `updater-desktop/dist-exe/RD-Checker-Updater-1.1.0.exe`
