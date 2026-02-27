@@ -6,8 +6,8 @@ RD Checker consists of:
 
 ## Current Versions
 
-- Extension version: `1.1.8`
-- Native updater version: `1.1.8`
+- Extension version: `1.1.9`
+- Native updater version: `1.1.9`
 
 ## Updater Package Policy
 
@@ -26,6 +26,7 @@ When you run `RD-Checker-Updater-Setup.exe`:
 3. It downloads update package into `%TEMP%\\RDCheckerUpdater`.
 4. If the package is `.exe`, it auto-replaces itself and restarts from installed path.
 5. If an old updater launches from temp, it promotes itself back to installed path automatically.
+6. When updater version is already latest, it still syncs project files from GitHub `main` into the installed folder.
 
 ## Key Files
 

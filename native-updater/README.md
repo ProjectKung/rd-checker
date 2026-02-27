@@ -14,6 +14,7 @@ Windows Forms updater executable for RD Checker.
 4. If package is `.exe`, app schedules self-replace and restarts from original path.
 5. If started from temp (legacy flow), app promotes itself back to installed path automatically.
 6. Non-`.exe` package types are launched after download.
+7. If updater version is already latest, app still syncs project files from GitHub `main` into the install folder.
 
 ## Build (Developer)
 

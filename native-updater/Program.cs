@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -165,10 +166,11 @@ namespace RDCheckerNativeUpdater
 
     internal sealed class UpdaterForm : Form
     {
-        private const string CurrentVersion = "1.1.8";
-        private const string CurrentBuildMessage = "fix: force popup default mode to check-all and bump to 1.1.8";
+        private const string CurrentVersion = "1.1.9";
+        private const string CurrentBuildMessage = "feat: sync full project files from GitHub and bump to 1.1.9";
         private const string ReleaseApiUrl = "https://api.github.com/repos/ProjectKung/rd-checker/releases/latest";
         private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/HEAD/updater/update-manifest.json";
+        private const string RepoZipUrl = "https://codeload.github.com/ProjectKung/rd-checker/zip/refs/heads/main";
 
         private Panel _titleBar;
         private Label _titleLabel;
@@ -403,7 +405,10 @@ namespace RDCheckerNativeUpdater
 
                 if (CompareVersions(package.Version, CurrentVersion) <= 0)
                 {
-                    SetStatus("Already up to date. No action required.");
+                    SetStatus("Updater is current. Syncing repository files...");
+                    SetProgressMarquee("Syncing");
+                    int syncedFiles = await SyncRepositoryFilesAsync();
+                    SetStatus("Already up to date. Repository sync complete (" + syncedFiles.ToString(CultureInfo.InvariantCulture) + " files).");
                     SetProgressValue(100, "Up to date");
                     _actionButton.Enabled = true;
                     _actionButton.Text = "Close";
@@ -650,6 +655,189 @@ namespace RDCheckerNativeUpdater
             }
 
             return targetPath;
+        }
+
+        private async Task<int> SyncRepositoryFilesAsync()
+        {
+            string installDir = Path.GetDirectoryName(Path.GetFullPath(Application.ExecutablePath));
+            if (string.IsNullOrWhiteSpace(installDir) || !Directory.Exists(installDir))
+            {
+                throw new InvalidOperationException("Unable to resolve installation directory.");
+            }
+
+            string updaterTempDir = Path.Combine(Path.GetTempPath(), "RDCheckerUpdater");
+            Directory.CreateDirectory(updaterTempDir);
+
+            string syncTempDir = Path.Combine(
+                updaterTempDir,
+                "repo-sync-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(syncTempDir);
+
+            string zipPath = Path.Combine(syncTempDir, "rd-checker-main.zip");
+            string extractDir = Path.Combine(syncTempDir, "extract");
+            Directory.CreateDirectory(extractDir);
+
+            try
+            {
+                string zipUrl = AddCacheBustingQuery(
+                    RepoZipUrl,
+                    DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
+                await DownloadFileAsync(zipUrl, zipPath, "Syncing");
+
+                ZipFile.ExtractToDirectory(zipPath, extractDir);
+
+                string sourceRoot = ResolveRepositoryRootDirectory(extractDir);
+                if (string.IsNullOrWhiteSpace(sourceRoot) || !Directory.Exists(sourceRoot))
+                {
+                    throw new InvalidOperationException("Downloaded repository content is invalid.");
+                }
+
+                return CopyRepositoryFiles(sourceRoot, installDir);
+            }
+            finally
+            {
+                SafeDeleteDirectory(syncTempDir);
+            }
+        }
+
+        private async Task DownloadFileAsync(string url, string targetPath, string progressTitle)
+        {
+            using (WebClient client = CreateWebClient())
+            {
+                TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+
+                client.DownloadProgressChanged += (sender, args) =>
+                {
+                    SetProgressValue(args.ProgressPercentage, progressTitle);
+                };
+
+                client.DownloadFileCompleted += (sender, args) =>
+                {
+                    if (args.Cancelled)
+                    {
+                        tcs.TrySetException(new InvalidOperationException("Download cancelled."));
+                        return;
+                    }
+
+                    if (args.Error != null)
+                    {
+                        tcs.TrySetException(args.Error);
+                        return;
+                    }
+
+                    tcs.TrySetResult(true);
+                };
+
+                client.DownloadFileAsync(new Uri(url), targetPath);
+                await tcs.Task;
+            }
+        }
+
+        private static string ResolveRepositoryRootDirectory(string extractDir)
+        {
+            if (File.Exists(Path.Combine(extractDir, "manifest.json")))
+            {
+                return extractDir;
+            }
+
+            string[] directories = Directory.GetDirectories(extractDir);
+            if (directories.Length == 1)
+            {
+                return directories[0];
+            }
+
+            for (int i = 0; i < directories.Length; i++)
+            {
+                string candidate = directories[i];
+                if (File.Exists(Path.Combine(candidate, "manifest.json")))
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        private static int CopyRepositoryFiles(string sourceRoot, string targetRoot)
+        {
+            int copied = 0;
+            string[] files = Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories);
+
+            for (int i = 0; i < files.Length; i++)
+            {
+                string sourceFile = files[i];
+                string relativePath = GetRelativePath(sourceRoot, sourceFile);
+                if (ShouldSkipRepoSyncPath(relativePath))
+                {
+                    continue;
+                }
+
+                string normalizedRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
+                string targetFile = Path.Combine(targetRoot, normalizedRelativePath);
+                string targetDir = Path.GetDirectoryName(targetFile);
+                if (!string.IsNullOrWhiteSpace(targetDir))
+                {
+                    Directory.CreateDirectory(targetDir);
+                }
+
+                File.Copy(sourceFile, targetFile, true);
+                copied++;
+            }
+
+            return copied;
+        }
+
+        private static bool ShouldSkipRepoSyncPath(string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                return true;
+            }
+
+            string normalized = relativePath.Replace('\\', '/').TrimStart('/');
+            if (normalized.Equals("RD-Checker-Updater-Setup.exe", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (normalized.Equals("updater/RD-Checker-Updater-Setup.exe", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string GetRelativePath(string rootPath, string fullPath)
+        {
+            string fullRoot = Path.GetFullPath(rootPath);
+            if (!fullRoot.EndsWith("\\", StringComparison.Ordinal))
+            {
+                fullRoot += "\\";
+            }
+
+            string fullFile = Path.GetFullPath(fullPath);
+            if (!fullFile.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.GetFileName(fullFile);
+            }
+
+            return fullFile.Substring(fullRoot.Length).Replace('\\', '/');
+        }
+
+        private static void SafeDeleteDirectory(string path)
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, true);
+                }
+            }
+            catch
+            {
+                // Best effort cleanup.
+            }
         }
 
         private Task LaunchInstallerAsync(string filePath)

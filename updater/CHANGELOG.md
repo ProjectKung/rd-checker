@@ -1,5 +1,10 @@
 # RD Checker Changelog
 
+## 1.1.9 - 2026-02-27
+- Added full project-folder sync from GitHub `main` when updater is already on latest version.
+- Updater now refreshes extension files in the installed directory, not only its own EXE.
+- Bumped extension/updater release to `1.1.9`.
+
 ## 1.1.8 - 2026-02-27
 - Forced popup startup mode to "เช็คทั้งหมด" in runtime JavaScript.
 - Fixed cases where old mode still appeared selected after update.
