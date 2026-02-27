@@ -34,4 +34,9 @@ If you want updater as executable:
 3. Build exe: `npm run build:win`
 
 Output:
-- `updater-desktop/dist-exe/RD-Checker-Updater-1.1.0.exe`
+- `updater-desktop/dist-exe/RD-Checker-Updater-Setup-1.1.0.exe`
+
+Installed app can update itself:
+1. Click `Check for Update`
+2. Click `Update Now`
+3. Click `Install and Restart`

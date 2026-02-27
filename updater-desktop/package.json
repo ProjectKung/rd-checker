@@ -7,7 +7,12 @@
   "author": "ProjectKung",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win portable"
+    "build:win": "electron-builder --win nsis",
+    "build:portable": "electron-builder --win portable",
+    "publish:win": "electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "electron": "^35.0.0",
@@ -21,19 +26,35 @@
     },
     "files": [
       "main.js",
+      "preload.js",
       "../updater-client/**/*",
       "../updater/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ProjectKung",
+        "repo": "rd-checker",
+        "releaseType": "release"
+      }
     ],
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]
         }
       ],
-      "artifactName": "RD-Checker-Updater-${version}.exe"
+      "artifactName": "RD-Checker-Updater-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "perMachine": false
     }
   }
 }

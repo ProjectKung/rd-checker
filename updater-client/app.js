@@ -19,9 +19,19 @@ const LOCAL_FALLBACK_MANIFEST = {
   ]
 };
 
+const isDesktopMode = Boolean(window.desktopUpdater && window.desktopUpdater.isDesktop);
+
 const state = {
-  installedVersion: localStorage.getItem(CONFIG.storageKey) || CONFIG.defaultVersion,
-  manifest: null
+  mode: isDesktopMode ? "desktop" : "web",
+  installedVersion: isDesktopMode
+    ? CONFIG.defaultVersion
+    : (localStorage.getItem(CONFIG.storageKey) || CONFIG.defaultVersion),
+  manifest: null,
+  desktop: {
+    hasUpdate: false,
+    downloaded: false,
+    unsubscribe: null
+  }
 };
 
 const ui = {
@@ -41,22 +51,257 @@ const ui = {
   closeSuccessBtn: document.getElementById("closeSuccessBtn")
 };
 
-init();
+init().catch((error) => {
+  console.error(error);
+  setStatus(`Init failed: ${error.message}`, true);
+});
 
-function init() {
-  ui.installedVersion.textContent = state.installedVersion;
+async function init() {
   ui.checkBtn.addEventListener("click", handleCheckUpdate);
   ui.updateBtn.addEventListener("click", handleUpdateNow);
   ui.closeSuccessBtn.addEventListener("click", () => {
     ui.successPanel.hidden = true;
   });
+
+  if (state.mode === "desktop") {
+    ui.downloadMeta.hidden = false;
+    ui.downloadMeta.textContent = "Desktop mode ready. Releases come from GitHub.";
+
+    state.desktop.unsubscribe = window.desktopUpdater.onEvent(handleDesktopUpdaterEvent);
+    window.addEventListener("beforeunload", () => {
+      if (state.desktop.unsubscribe) {
+        state.desktop.unsubscribe();
+      }
+    });
+
+    const version = await window.desktopUpdater.getAppVersion();
+    state.installedVersion = version || CONFIG.defaultVersion;
+    ui.installedVersion.textContent = state.installedVersion;
+    ui.latestVersion.textContent = state.installedVersion;
+    renderNotes(["Desktop auto-update is enabled for installed build."]);
+    setStatus("Ready. Click 'Check for Update'.", false);
+    setProgress(0, "Idle");
+    return;
+  }
+
+  ui.installedVersion.textContent = state.installedVersion;
+  setStatus("Ready to check for updates.", false);
+  setProgress(0, "Idle");
 }
 
 async function handleCheckUpdate() {
+  if (state.mode === "desktop") {
+    await handleDesktopCheckUpdate();
+    return;
+  }
+
+  await handleWebCheckUpdate();
+}
+
+async function handleUpdateNow() {
+  if (state.mode === "desktop") {
+    await handleDesktopUpdateNow();
+    return;
+  }
+
+  await handleWebUpdateNow();
+}
+
+async function handleDesktopCheckUpdate() {
   ui.checkBtn.disabled = true;
   ui.updateBtn.disabled = true;
+  ui.updateBtn.textContent = "Update Now";
+  state.desktop.hasUpdate = false;
+  state.desktop.downloaded = false;
+  setProgress(0, "Checking");
+  setStatus("Checking for update from GitHub Releases...", false);
+
+  const result = await window.desktopUpdater.checkForUpdates();
+  if (!result || !result.ok) {
+    setStatus(`Update check failed: ${(result && result.error) || "Unknown error"}`, true);
+    setProgress(0, "Failed");
+    ui.checkBtn.disabled = false;
+  }
+}
+
+async function handleDesktopUpdateNow() {
+  if (!state.desktop.hasUpdate && !state.desktop.downloaded) {
+    setStatus("No update available. Click 'Check for Update' first.", true);
+    return;
+  }
+
+  if (state.desktop.downloaded) {
+    ui.checkBtn.disabled = true;
+    ui.updateBtn.disabled = true;
+    setStatus("Installing update and restarting app...", false);
+    const result = await window.desktopUpdater.installUpdate();
+    if (!result || !result.ok) {
+      setStatus(`Install failed: ${(result && result.error) || "Unknown error"}`, true);
+      ui.checkBtn.disabled = false;
+      ui.updateBtn.disabled = false;
+    }
+    return;
+  }
+
+  ui.checkBtn.disabled = true;
+  ui.updateBtn.disabled = true;
+  setStatus("Starting update download...", false);
+  const result = await window.desktopUpdater.downloadUpdate();
+  if (!result || !result.ok) {
+    setStatus(`Download failed: ${(result && result.error) || "Unknown error"}`, true);
+    ui.checkBtn.disabled = false;
+    ui.updateBtn.disabled = !state.desktop.hasUpdate;
+  }
+}
+
+function handleDesktopUpdaterEvent(event) {
+  if (!event || !event.type) {
+    return;
+  }
+
+  switch (event.type) {
+    case "checking-for-update": {
+      setProgress(1, "Checking");
+      setStatus("Checking latest release...", false);
+      break;
+    }
+
+    case "update-available": {
+      const manifest = desktopInfoToManifest(event.info);
+      state.manifest = manifest;
+      state.desktop.hasUpdate = true;
+      state.desktop.downloaded = false;
+      updateManifestUi(manifest);
+      setStatus(`Update available: ${manifest.version}`, false);
+      setProgress(0, "Ready to download");
+      ui.downloadMeta.hidden = false;
+      ui.downloadMeta.textContent = "Release found. Click 'Update Now'.";
+      ui.checkBtn.disabled = false;
+      ui.updateBtn.disabled = false;
+      ui.updateBtn.textContent = "Update Now";
+      break;
+    }
+
+    case "update-not-available": {
+      const manifest = desktopInfoToManifest(event.info);
+      manifest.version = manifest.version === "-" ? state.installedVersion : manifest.version;
+      state.manifest = manifest;
+      state.desktop.hasUpdate = false;
+      state.desktop.downloaded = false;
+      updateManifestUi(manifest);
+      setStatus("No new update. You are already on latest version.", false);
+      setProgress(100, "Up to date");
+      ui.downloadMeta.hidden = false;
+      ui.downloadMeta.textContent = "No update package needed.";
+      ui.checkBtn.disabled = false;
+      ui.updateBtn.disabled = true;
+      ui.updateBtn.textContent = "Update Now";
+      break;
+    }
+
+    case "download-progress": {
+      const progress = event.progress || {};
+      setProgress(progress.percent || 0, "Downloading update");
+      ui.downloadMeta.hidden = false;
+      ui.downloadMeta.textContent = formatProgressMeta(progress);
+      break;
+    }
+
+    case "update-downloaded": {
+      const manifest = desktopInfoToManifest(event.info || state.manifest);
+      state.manifest = manifest;
+      state.desktop.hasUpdate = true;
+      state.desktop.downloaded = true;
+      updateManifestUi(manifest);
+      setProgress(100, "Ready to install");
+      setStatus("Download complete. Click 'Install and Restart'.", false);
+      ui.downloadMeta.hidden = false;
+      ui.downloadMeta.textContent = "Update package is ready to install.";
+      ui.checkBtn.disabled = false;
+      ui.updateBtn.disabled = false;
+      ui.updateBtn.textContent = "Install and Restart";
+      ui.successMessage.textContent = `Version ${manifest.version} downloaded. Click Install and Restart.`;
+      ui.successPanel.hidden = false;
+      break;
+    }
+
+    case "error": {
+      setStatus(`Updater error: ${event.message || "Unknown error"}`, true);
+      setProgress(0, "Failed");
+      ui.checkBtn.disabled = false;
+      ui.updateBtn.disabled = !state.desktop.hasUpdate;
+      break;
+    }
+
+    default:
+      break;
+  }
+}
+
+function desktopInfoToManifest(info) {
+  return {
+    version: (info && info.version) || "-",
+    release_date: formatReleaseDate(info && info.releaseDate),
+    notes: normalizeNotes(info && info.releaseNotes)
+  };
+}
+
+function normalizeNotes(rawNotes) {
+  if (!rawNotes) {
+    return ["No release notes available."];
+  }
+
+  if (Array.isArray(rawNotes)) {
+    const list = rawNotes
+      .map((item) => String(item).trim())
+      .filter(Boolean);
+    return list.length ? list : ["No release notes available."];
+  }
+
+  if (typeof rawNotes === "string") {
+    const list = rawNotes
+      .split(/\r?\n/)
+      .map((line) => line.trim().replace(/^[-*]\s*/, ""))
+      .filter(Boolean);
+    return list.length ? list : ["No release notes available."];
+  }
+
+  return ["No release notes available."];
+}
+
+function formatReleaseDate(value) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return date.toLocaleString();
+}
+
+function formatProgressMeta(progress) {
+  const transferred = Number(progress.transferred || 0);
+  const total = Number(progress.total || 0);
+  const speed = Number(progress.bytesPerSecond || 0);
+
+  let message = `${formatBytes(transferred)} downloaded`;
+  if (total > 0) {
+    message += ` / ${formatBytes(total)}`;
+  }
+  if (speed > 0) {
+    message += ` (${formatBytes(speed)}/s)`;
+  }
+  return message;
+}
+
+async function handleWebCheckUpdate() {
+  ui.checkBtn.disabled = true;
+  ui.updateBtn.disabled = true;
+  ui.updateBtn.textContent = "Update Now";
   setProgress(0, "Checking update manifest...");
   setStatus("Checking for latest update...", false);
+
   try {
     const manifest = await loadManifest();
     validateManifest(manifest);
@@ -81,7 +326,7 @@ async function handleCheckUpdate() {
   }
 }
 
-async function handleUpdateNow() {
+async function handleWebUpdateNow() {
   if (!state.manifest) {
     setStatus("No manifest loaded. Click 'Check for Update' first.", true);
     return;
@@ -124,8 +369,7 @@ async function loadManifest() {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      const data = await response.json();
-      return data;
+      return await response.json();
     } catch (error) {
       errors.push(`${url}: ${error.message}`);
     }
@@ -152,7 +396,7 @@ function validateManifest(manifest) {
 function updateManifestUi(manifest) {
   ui.latestVersion.textContent = manifest.version;
   ui.releaseDate.textContent = manifest.release_date || "-";
-  renderNotes(manifest.notes);
+  renderNotes(manifest.notes || []);
 }
 
 function renderNotes(notes) {
@@ -163,6 +407,7 @@ function renderNotes(notes) {
     ui.patchNotes.appendChild(item);
     return;
   }
+
   notes.forEach((note) => {
     const item = document.createElement("li");
     item.textContent = note;
@@ -172,7 +417,7 @@ function renderNotes(notes) {
 
 function setStatus(message, isError) {
   ui.statusText.textContent = message;
-  ui.statusText.classList.toggle("error", !!isError);
+  ui.statusText.classList.toggle("error", Boolean(isError));
 }
 
 function setProgress(percent, label) {
@@ -202,20 +447,23 @@ async function downloadPackage(url, fileName) {
 
   const chunks = [];
   let receivedBytes = 0;
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
       break;
     }
+
     chunks.push(value);
     receivedBytes += value.length;
+
     if (totalBytes > 0) {
-      const percent = (receivedBytes / totalBytes) * 100;
-      setProgress(percent, "Downloading package");
+      setProgress((receivedBytes / totalBytes) * 100, "Downloading package");
     } else {
       const pseudo = Math.min(95, Math.floor(receivedBytes / 50000));
       setProgress(pseudo, "Downloading package");
     }
+
     ui.downloadMeta.textContent = `${formatBytes(receivedBytes)} downloaded${totalBytes ? ` / ${formatBytes(totalBytes)}` : ""}`;
   }
 
@@ -251,6 +499,7 @@ function compareVersions(a, b) {
       return -1;
     }
   }
+
   return 0;
 }
 
@@ -258,7 +507,7 @@ function toVersionParts(value) {
   return String(value)
     .split(".")
     .map((chunk) => parseInt(chunk.replace(/[^\d]/g, ""), 10))
-    .map((n) => (Number.isFinite(n) ? n : 0));
+    .map((num) => (Number.isFinite(num) ? num : 0));
 }
 
 function formatBytes(bytes) {
