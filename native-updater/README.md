@@ -1,23 +1,23 @@
-# Native Updater (No HTML)
+# Native Updater
 
-This updater is a native Windows Forms executable.
+Windows Forms updater executable for RD Checker.
 
-- Output file: `RD-Checker-Updater-Setup.exe`
-- Source file: `native-updater/Program.cs`
-- Build script: `BUILD-RD-UPDATER-NATIVE.bat`
-
-## One-Click Build
-
-Double-click:
-
-`BUILD-RD-UPDATER-NATIVE.bat`
-
-This builds `RD-Checker-Updater-Setup.exe` in the repository root.
+- Main source: `native-updater/Program.cs`
+- Root output: `RD-Checker-Updater-Setup.exe`
+- Published package: `updater/RD-Checker-Updater-Setup.exe`
 
 ## Runtime Flow
 
-1. App auto-checks latest package from GitHub Release
-2. If not found, app falls back to `updater/update-manifest.json`
-3. App downloads with progress
-4. If package is `.exe`, app auto-replaces itself and restarts
-5. Otherwise, app launches downloaded installer automatically
+1. App checks latest package from GitHub Release API.
+2. If no release asset is found, app falls back to `updater/update-manifest.json`.
+3. App downloads package to `%TEMP%\RDCheckerUpdater`.
+4. If package is `.exe`, app schedules self-replace and restarts from original path.
+5. If started from temp (legacy flow), app promotes itself back to installed path automatically.
+6. Non-`.exe` package types are launched after download.
+
+## Build (Developer)
+
+Compile with C# compiler (`csc.exe`), then copy output to both:
+
+- `RD-Checker-Updater-Setup.exe`
+- `updater/RD-Checker-Updater-Setup.exe`

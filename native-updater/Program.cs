@@ -165,7 +165,7 @@ namespace RDCheckerNativeUpdater
 
     internal sealed class UpdaterForm : Form
     {
-        private const string CurrentVersion = "1.1.2";
+        private const string CurrentVersion = "1.1.3";
         private const string ReleaseApiUrl = "https://api.github.com/repos/ProjectKung/rd-checker/releases/latest";
         private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/update-manifest.json";
 

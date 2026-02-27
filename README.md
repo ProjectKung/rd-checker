@@ -1,67 +1,42 @@
-# RD Checker Chrome Extension
+# RD Checker
 
-ส่วนแรกของระบบช่วยดูใน Chrome Extension เพื่อเทียบข้อมูล RD
+RD Checker consists of:
+- Chrome extension (`manifest.json`, `popup.*`, `background.js`, `content.js`)
+- Native updater executable (`RD-Checker-Updater-Setup.exe`)
 
-## วิธีการติดตั้ง
+## Current Versions
 
-1. Open Chrome and go to `chrome://extensions/`
-2. Enable "Developer mode" (top right)
-3. Click "Load unpacked"
-4. Select the `rd-checker` folder
+- Extension version: `1.1.3`
+- Native updater version: `1.1.3`
 
-## ฟีเจอร์
+## Updater Package Policy
 
-✅ Extract data from PDF:
-   - RD Code (e.g., RD69-3M00166)
-   - Completion Date (วันที่ดำเนินเสร็จ)
-   - Software Version (16.0(9d))
+Repository now keeps a single updater package filename only:
 
-✅ Extract data from website:
-   - Timestamp from configuration page
-   - Configuration data
+- `updater/RD-Checker-Updater-Setup.exe`
 
-✅ Compare data:
-   - Check if completion date <= deadline (09-12-2568 10:23:00)
-   - Check if software version = 16.0(9d)
-   - Display: "COMPLETE" or "INCOMPLETE, fix [time/version]"
+No version-suffixed updater package files are kept in `updater/`.
 
-## โครงสร้างไฟล์
+## Native Updater Behavior
 
-```
-rd-checker/
-├── manifest.json      - Chrome extension configuration
-├── popup.html         - User interface
-├── popup.css          - Styling
-├── popup.js           - Main logic (PDF parsing, comparison)
-├── background.js      - Background service worker
-├── content.js         - Content script for website extraction
-└── README.md          - This file
-```
+When you run `RD-Checker-Updater-Setup.exe`:
 
-## การใช้งาน
+1. It checks GitHub Release API.
+2. If no release asset is available, it uses `updater/update-manifest.json`.
+3. It downloads update package into `%TEMP%\\RDCheckerUpdater`.
+4. If the package is `.exe`, it auto-replaces itself and restarts from installed path.
+5. If an old updater launches from temp, it promotes itself back to installed path automatically.
 
-1. **Extract PDF Data:**
-   - Click on extension icon
-   - Select PDF file
-   - Click "Extract PDF Data"
+## Key Files
 
-2. **Extract Website Data:**
-   - Enter website URL
-   - Click "Extract Website Data"
+- Extension manifest: `manifest.json`
+- Native updater source: `native-updater/Program.cs`
+- Updater manifest: `updater/update-manifest.json`
+- Published updater binary: `updater/RD-Checker-Updater-Setup.exe`
 
-3. **Compare Data:**
-   - Click "Compare Data"
-   - View results
+## Developer Notes
 
-## สถานะการเทียบ
-
-- **COMPLETE**: ข้อมูลตรงตามเงื่อนไข
-- **INCOMPLETE, fix time**: วันที่เกินกำหนด
-- **INCOMPLETE, fix version**: เวอร์ชั่นไม่ตรงกัน
-
-## Next Steps
-
-- Improve PDF parsing accuracy
-- Add support for Thai Buddhist year conversion
-- Test with actual configuration page HTML
-- Add ability to save/export results
+- Build output should be copied to both:
+  - `RD-Checker-Updater-Setup.exe`
+  - `updater/RD-Checker-Updater-Setup.exe`
+- Temporary compiler artifacts (`CSC*.TMP`) are not runtime files and should be cleaned.

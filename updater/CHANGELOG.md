@@ -1,5 +1,10 @@
 # RD Checker Changelog
 
+## 1.1.3 - 2026-02-27
+- Updated documentation to match current updater behavior.
+- Kept updater package as single fixed filename (`updater/RD-Checker-Updater-Setup.exe`).
+- Cleaned non-runtime helper/temp files from repository.
+
 ## 1.1.2 - 2026-02-27
 - Test release to validate end-to-end self-update flow from `1.1.1`.
 - Kept auto-replace and restart behavior for updater executable packages.
