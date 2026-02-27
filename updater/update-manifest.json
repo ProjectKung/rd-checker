@@ -1,13 +1,13 @@
 {
-  "version": "1.1.1",
+  "version": "1.1.2",
   "release_date": "2026-02-27",
-  "package_name": "RD-Checker-Updater-Setup-1.1.1.exe",
-  "package_url": "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/RD-Checker-Updater-Setup-1.1.1.exe",
+  "package_name": "RD-Checker-Updater-Setup-1.1.2.exe",
+  "package_url": "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/RD-Checker-Updater-Setup-1.1.2.exe",
   "package_size": "auto",
   "notes": [
-    "Updated updater executable icon to use the new design.",
-    "Improved icon scaling so desktop icon appears larger and clearer.",
-    "Updated native build flow to prefer native-updater/app-zoom.ico.",
-    "Updater now auto-replaces its own EXE and restarts automatically."
+    "Test release 1.1.2 for self-update validation.",
+    "Updater auto-replaces its own EXE and restarts automatically.",
+    "Fallback manifest now points directly to an executable package."
   ]
 }
+

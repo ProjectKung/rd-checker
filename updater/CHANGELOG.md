@@ -1,5 +1,9 @@
 # RD Checker Changelog
 
+## 1.1.2 - 2026-02-27
+- Test release to validate end-to-end self-update flow from `1.1.1`.
+- Kept auto-replace and restart behavior for updater executable packages.
+
 ## 1.1.1 - 2026-02-27
 - Updated updater executable icon to use the new design.
 - Improved icon scaling so desktop icon appears larger and clearer.
