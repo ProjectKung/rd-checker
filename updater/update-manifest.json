@@ -1,11 +1,11 @@
 {
-  "version": "1.1.12",
+  "version": "1.2.0",
   "release_date": "2026-02-27",
   "package_name": "RD-Checker-Updater-Setup.exe",
   "package_url": "https://raw.githubusercontent.com/ProjectKung/rd-checker/HEAD/updater/RD-Checker-Updater-Setup.exe",
   "package_size": "auto",
   "notes": [
-    "Release 1.1.12: version bump and cleanup.",
+    "Release 1.2.0: version bump and clear temp files.",
     "Keeps full project-folder sync behavior from GitHub main branch.",
     "Keeps self-replace and auto-restart behavior for updater executable updates."
   ]

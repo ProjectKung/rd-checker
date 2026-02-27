@@ -9,8 +9,8 @@ RD Checker เป็นเครื่องมือช่วยตรวจง
 
 ## เวอร์ชันปัจจุบัน
 
-- Extension Version: `1.1.12`
-- Native Updater Version: `1.1.12`
+- Extension Version: `1.2.0`
+- Native Updater Version: `1.2.0`
 - Update Manifest Date: `2026-02-27`
 
 ไฟล์ที่เป็นแหล่งอ้างอิงเวอร์ชัน:
