@@ -166,8 +166,8 @@ namespace RDCheckerNativeUpdater
 
     internal sealed class UpdaterForm : Form
     {
-        private const string CurrentVersion = "1.2.0";
-        private const string CurrentBuildMessage = "release: bump version to 1.2.0 and clear temp files";
+        private const string CurrentVersion = "1.2.1";
+        private const string CurrentBuildMessage = "release: bump version to 1.2.1 and keep embedded updater icon";
         private const string ReleaseApiUrl = "https://api.github.com/repos/ProjectKung/rd-checker/releases/latest";
         private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/HEAD/updater/update-manifest.json";
         private const string RepoZipUrl = "https://codeload.github.com/ProjectKung/rd-checker/zip/refs/heads/main";
