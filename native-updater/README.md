@@ -19,4 +19,5 @@ This builds `RD-Checker-Updater-Setup.exe` in the repository root.
 1. App auto-checks latest package from GitHub Release
 2. If not found, app falls back to `updater/update-manifest.json`
 3. App downloads with progress
-4. App launches downloaded installer automatically
+4. If package is `.exe`, app auto-replaces itself and restarts
+5. Otherwise, app launches downloaded installer automatically

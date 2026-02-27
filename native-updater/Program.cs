@@ -18,6 +18,11 @@ namespace RDCheckerNativeUpdater
         [STAThread]
         private static void Main()
         {
+            if (TryInstallIntoExistingLocationFromTemp())
+            {
+                return;
+            }
+
             ServicePointManager.SecurityProtocol =
                 SecurityProtocolType.Tls12 |
                 SecurityProtocolType.Tls11 |
@@ -26,6 +31,127 @@ namespace RDCheckerNativeUpdater
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new UpdaterForm());
+        }
+
+        private static bool TryInstallIntoExistingLocationFromTemp()
+        {
+            try
+            {
+                string currentExe = Path.GetFullPath(Application.ExecutablePath);
+                string tempRoot = Path.GetFullPath(Path.GetTempPath());
+
+                if (!currentExe.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                Process current = Process.GetCurrentProcess();
+                Process[] sameName = Process.GetProcessesByName(current.ProcessName);
+                string targetExe = null;
+                int targetPid = -1;
+
+                for (int i = 0; i < sameName.Length; i++)
+                {
+                    Process process = sameName[i];
+                    if (process.Id == current.Id)
+                    {
+                        continue;
+                    }
+
+                    string candidatePath;
+                    try
+                    {
+                        candidatePath = process.MainModule == null ? null : process.MainModule.FileName;
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(candidatePath))
+                    {
+                        continue;
+                    }
+
+                    string fullCandidate = Path.GetFullPath(candidatePath);
+                    if (fullCandidate.Equals(currentExe, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (fullCandidate.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (!Path.GetFileName(fullCandidate).Equals(Path.GetFileName(currentExe), StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    targetExe = fullCandidate;
+                    targetPid = process.Id;
+                    break;
+                }
+
+                if (string.IsNullOrWhiteSpace(targetExe) || targetPid <= 0)
+                {
+                    return false;
+                }
+
+                string scriptPath = BuildInstallFromTempScript(currentExe, targetExe, targetPid);
+                ProcessStartInfo scriptInfo = new ProcessStartInfo("cmd.exe");
+                scriptInfo.Arguments = "/c \"" + scriptPath + "\"";
+                scriptInfo.UseShellExecute = false;
+                scriptInfo.CreateNoWindow = true;
+                scriptInfo.WindowStyle = ProcessWindowStyle.Hidden;
+                Process.Start(scriptInfo);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string BuildInstallFromTempScript(string sourcePath, string destinationPath, int waitProcessId)
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "RDCheckerUpdater");
+            Directory.CreateDirectory(tempDir);
+
+            string scriptPath = Path.Combine(
+                tempDir,
+                "promote-update-" + Guid.NewGuid().ToString("N") + ".cmd");
+
+            string[] lines = new[]
+            {
+                "@echo off",
+                "setlocal",
+                "set \"SRC=" + sourcePath + "\"",
+                "set \"DST=" + destinationPath + "\"",
+                "set \"PID=" + waitProcessId.ToString(CultureInfo.InvariantCulture) + "\"",
+                "for /L %%I in (1,1,180) do (",
+                "  tasklist /FI \"PID eq %PID%\" 2>nul | find /I \"%PID%\" >nul",
+                "  if errorlevel 1 goto copy",
+                "  timeout /t 1 /nobreak >nul",
+                ")",
+                ":copy",
+                "for /L %%I in (1,1,60) do (",
+                "  copy /y \"%SRC%\" \"%DST%\" >nul 2>&1",
+                "  if not errorlevel 1 goto launch",
+                "  timeout /t 1 /nobreak >nul",
+                ")",
+                "goto cleanup",
+                ":launch",
+                "start \"\" \"%DST%\"",
+                ":cleanup",
+                "del /f /q \"%SRC%\" >nul 2>&1",
+                "del /f /q \"%~f0\" >nul 2>&1",
+                "exit /b 0"
+            };
+
+            File.WriteAllLines(scriptPath, lines);
+            return scriptPath;
         }
     }
 
@@ -63,13 +189,31 @@ namespace RDCheckerNativeUpdater
             FormBorderStyle = FormBorderStyle.None;
             MaximizeBox = false;
             MinimizeBox = false;
+            ShowIcon = true;
             ShowInTaskbar = true;
             ClientSize = new Size(560, 420);
             BackColor = Color.FromArgb(20, 30, 45);
+            ApplyWindowIcon();
 
             BuildUi();
 
             Shown += async (sender, args) => await RunUpdateFlowAsync();
+        }
+
+        private void ApplyWindowIcon()
+        {
+            try
+            {
+                Icon exeIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                if (exeIcon != null)
+                {
+                    Icon = exeIcon;
+                }
+            }
+            catch
+            {
+                // Keep default icon if extraction fails.
+            }
         }
 
         private void BuildUi()
@@ -236,6 +380,14 @@ namespace RDCheckerNativeUpdater
 
                 SetStatus("Downloading update file...");
                 string downloadedFile = await DownloadPackageAsync(package);
+
+                if (IsExecutablePackage(downloadedFile))
+                {
+                    SetStatus("Applying update and restarting...");
+                    SetProgressValue(100, "Restarting");
+                    ScheduleSelfReplaceAndRestart(downloadedFile);
+                    return;
+                }
 
                 SetProgressMarquee("Installing");
                 await LaunchInstallerAsync(downloadedFile);
@@ -443,6 +595,68 @@ namespace RDCheckerNativeUpdater
             startInfo.UseShellExecute = true;
             Process.Start(startInfo);
             return Task.FromResult(0);
+        }
+
+        private static bool IsExecutablePackage(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return false;
+            }
+
+            return Path.GetExtension(filePath).Equals(".exe", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ScheduleSelfReplaceAndRestart(string downloadedFile)
+        {
+            string currentExe = Application.ExecutablePath;
+            string scriptPath = BuildSelfReplaceScript(downloadedFile, currentExe);
+
+            ProcessStartInfo startInfo = new ProcessStartInfo("cmd.exe");
+            startInfo.Arguments = "/c \"" + scriptPath + "\"";
+            startInfo.UseShellExecute = false;
+            startInfo.CreateNoWindow = true;
+            startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+            Process.Start(startInfo);
+
+            BeginInvoke(new Action(() =>
+            {
+                _isRunning = false;
+                Close();
+            }));
+        }
+
+        private static string BuildSelfReplaceScript(string sourcePath, string destinationPath)
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "RDCheckerUpdater");
+            Directory.CreateDirectory(tempDir);
+
+            string scriptPath = Path.Combine(
+                tempDir,
+                "apply-update-" + Guid.NewGuid().ToString("N") + ".cmd");
+
+            string[] lines = new[]
+            {
+                "@echo off",
+                "setlocal",
+                "set \"SRC=" + sourcePath + "\"",
+                "set \"DST=" + destinationPath + "\"",
+                "for /L %%I in (1,1,120) do (",
+                "  copy /y \"%SRC%\" \"%DST%\" >nul 2>&1",
+                "  if not errorlevel 1 goto launch",
+                "  timeout /t 1 /nobreak >nul",
+                ")",
+                "goto cleanup",
+                ":launch",
+                "start \"\" \"%DST%\"",
+                ":cleanup",
+                "del /f /q \"%SRC%\" >nul 2>&1",
+                "del /f /q \"%~f0\" >nul 2>&1",
+                "exit /b 0"
+            };
+
+            File.WriteAllLines(scriptPath, lines);
+            return scriptPath;
         }
 
         private async Task<string> DownloadStringAsync(string url)

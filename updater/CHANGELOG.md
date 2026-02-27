@@ -4,6 +4,7 @@
 - Updated updater executable icon to use the new design.
 - Improved icon scaling so desktop icon appears larger and clearer.
 - Updated native build script to prioritize `native-updater/app-zoom.ico`.
+- Updater now auto-replaces its own EXE and restarts automatically.
 
 ## 1.1.0 - 2026-02-27
 - Added standalone updater client in `updater-client/`.
