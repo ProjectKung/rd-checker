@@ -1,0 +1,741 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing;
+using System.Globalization;
+using System.IO;
+using System.Net;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Web.Script.Serialization;
+using System.Windows.Forms;
+
+namespace RDCheckerNativeUpdater
+{
+    internal static class Program
+    {
+        [STAThread]
+        private static void Main()
+        {
+            ServicePointManager.SecurityProtocol =
+                SecurityProtocolType.Tls12 |
+                SecurityProtocolType.Tls11 |
+                SecurityProtocolType.Tls;
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new UpdaterForm());
+        }
+    }
+
+    internal sealed class UpdatePackage
+    {
+        public string Version;
+        public string DownloadUrl;
+        public string FileName;
+        public string ReleaseDate;
+    }
+
+    internal sealed class UpdaterForm : Form
+    {
+        private const string CurrentVersion = "1.1.0";
+        private const string ReleaseApiUrl = "https://api.github.com/repos/ProjectKung/rd-checker/releases/latest";
+        private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/update-manifest.json";
+
+        private Panel _titleBar;
+        private Label _titleLabel;
+        private Button _closeButton;
+        private Label _headingLabel;
+        private Label _statusLabel;
+        private ProgressBar _progressBar;
+        private Label _progressLabel;
+        private Label _stepCheck;
+        private Label _stepDownload;
+        private Label _stepInstall;
+        private Label _installedValue;
+        private Label _latestValue;
+        private Label _releaseValue;
+        private Button _actionButton;
+
+        private bool _isRunning;
+
+        public UpdaterForm()
+        {
+            Text = "RD Checker Updater";
+            StartPosition = FormStartPosition.CenterScreen;
+            FormBorderStyle = FormBorderStyle.None;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            ShowInTaskbar = true;
+            ClientSize = new Size(560, 420);
+            BackColor = Color.FromArgb(20, 30, 45);
+
+            BuildUi();
+
+            Shown += async (sender, args) => await RunUpdateFlowAsync();
+        }
+
+        private void BuildUi()
+        {
+            _titleBar = new Panel();
+            _titleBar.Dock = DockStyle.Top;
+            _titleBar.Height = 38;
+            _titleBar.BackColor = Color.FromArgb(241, 245, 251);
+            _titleBar.MouseDown += TitleBar_MouseDown;
+            Controls.Add(_titleBar);
+
+            _titleLabel = new Label();
+            _titleLabel.Text = "RD Checker Updater";
+            _titleLabel.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            _titleLabel.ForeColor = Color.FromArgb(34, 49, 74);
+            _titleLabel.AutoSize = true;
+            _titleLabel.Location = new Point(12, 10);
+            _titleLabel.MouseDown += TitleBar_MouseDown;
+            _titleBar.Controls.Add(_titleLabel);
+
+            _closeButton = new Button();
+            _closeButton.FlatStyle = FlatStyle.Flat;
+            _closeButton.FlatAppearance.BorderSize = 0;
+            _closeButton.Text = "X";
+            _closeButton.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            _closeButton.ForeColor = Color.FromArgb(43, 56, 77);
+            _closeButton.Size = new Size(46, 38);
+            _closeButton.Location = new Point(ClientSize.Width - 46, 0);
+            _closeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _closeButton.BackColor = Color.Transparent;
+            _closeButton.Cursor = Cursors.Hand;
+            _closeButton.Click += (sender, args) => Close();
+            _closeButton.MouseEnter += (sender, args) => _closeButton.BackColor = Color.FromArgb(232, 45, 63);
+            _closeButton.MouseLeave += (sender, args) => _closeButton.BackColor = Color.Transparent;
+            _titleBar.Controls.Add(_closeButton);
+
+            Panel body = new Panel();
+            body.Dock = DockStyle.Fill;
+            body.BackColor = Color.White;
+            body.Padding = new Padding(18, 14, 18, 14);
+            Controls.Add(body);
+
+            _headingLabel = new Label();
+            _headingLabel.Text = "Preparing Update";
+            _headingLabel.Font = new Font("Segoe UI", 20f, FontStyle.Bold);
+            _headingLabel.AutoSize = true;
+            _headingLabel.Location = new Point(14, 12);
+            body.Controls.Add(_headingLabel);
+
+            _statusLabel = new Label();
+            _statusLabel.Text = "Starting updater...";
+            _statusLabel.Font = new Font("Segoe UI", 10f, FontStyle.Regular);
+            _statusLabel.ForeColor = Color.FromArgb(58, 74, 98);
+            _statusLabel.AutoSize = false;
+            _statusLabel.Size = new Size(500, 22);
+            _statusLabel.Location = new Point(16, 56);
+            body.Controls.Add(_statusLabel);
+
+            _progressBar = new ProgressBar();
+            _progressBar.Style = ProgressBarStyle.Marquee;
+            _progressBar.MarqueeAnimationSpeed = 24;
+            _progressBar.Minimum = 0;
+            _progressBar.Maximum = 100;
+            _progressBar.Size = new Size(522, 22);
+            _progressBar.Location = new Point(16, 86);
+            body.Controls.Add(_progressBar);
+
+            _progressLabel = new Label();
+            _progressLabel.Text = "Idle - 0%";
+            _progressLabel.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+            _progressLabel.ForeColor = Color.FromArgb(77, 94, 118);
+            _progressLabel.AutoSize = false;
+            _progressLabel.TextAlign = ContentAlignment.MiddleRight;
+            _progressLabel.Size = new Size(522, 18);
+            _progressLabel.Location = new Point(16, 112);
+            body.Controls.Add(_progressLabel);
+
+            _stepCheck = BuildStepLabel("Check");
+            _stepCheck.Location = new Point(16, 138);
+            body.Controls.Add(_stepCheck);
+
+            _stepDownload = BuildStepLabel("Download");
+            _stepDownload.Location = new Point(194, 138);
+            body.Controls.Add(_stepDownload);
+
+            _stepInstall = BuildStepLabel("Install");
+            _stepInstall.Location = new Point(372, 138);
+            body.Controls.Add(_stepInstall);
+
+            Label installedKey = BuildMetaKeyLabel("Installed");
+            installedKey.Location = new Point(16, 186);
+            body.Controls.Add(installedKey);
+
+            _installedValue = BuildMetaValueLabel(CurrentVersion);
+            _installedValue.Location = new Point(16, 206);
+            body.Controls.Add(_installedValue);
+
+            Label latestKey = BuildMetaKeyLabel("Latest");
+            latestKey.Location = new Point(194, 186);
+            body.Controls.Add(latestKey);
+
+            _latestValue = BuildMetaValueLabel("-");
+            _latestValue.Location = new Point(194, 206);
+            body.Controls.Add(_latestValue);
+
+            Label releaseKey = BuildMetaKeyLabel("Release Date");
+            releaseKey.Location = new Point(372, 186);
+            body.Controls.Add(releaseKey);
+
+            _releaseValue = BuildMetaValueLabel("-");
+            _releaseValue.Location = new Point(372, 206);
+            body.Controls.Add(_releaseValue);
+
+            _actionButton = new Button();
+            _actionButton.Text = "Please wait...";
+            _actionButton.Enabled = false;
+            _actionButton.FlatStyle = FlatStyle.Flat;
+            _actionButton.FlatAppearance.BorderSize = 0;
+            _actionButton.BackColor = Color.FromArgb(28, 114, 218);
+            _actionButton.ForeColor = Color.White;
+            _actionButton.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            _actionButton.Size = new Size(180, 36);
+            _actionButton.Location = new Point(358, 350);
+            _actionButton.Cursor = Cursors.Hand;
+            _actionButton.Click += ActionButton_Click;
+            body.Controls.Add(_actionButton);
+        }
+
+        private static Label BuildStepLabel(string text)
+        {
+            Label label = new Label();
+            label.Text = text;
+            label.TextAlign = ContentAlignment.MiddleCenter;
+            label.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            label.Size = new Size(166, 30);
+            label.BackColor = Color.FromArgb(246, 249, 253);
+            label.ForeColor = Color.FromArgb(103, 120, 143);
+            label.BorderStyle = BorderStyle.FixedSingle;
+            return label;
+        }
+
+        private static Label BuildMetaKeyLabel(string text)
+        {
+            Label label = new Label();
+            label.Text = text;
+            label.AutoSize = false;
+            label.TextAlign = ContentAlignment.MiddleCenter;
+            label.Size = new Size(166, 18);
+            label.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+            label.ForeColor = Color.FromArgb(96, 112, 134);
+            return label;
+        }
+
+        private static Label BuildMetaValueLabel(string text)
+        {
+            Label label = new Label();
+            label.Text = text;
+            label.AutoSize = false;
+            label.TextAlign = ContentAlignment.MiddleCenter;
+            label.Size = new Size(166, 26);
+            label.Font = new Font("Segoe UI", 12f, FontStyle.Bold);
+            label.ForeColor = Color.FromArgb(32, 46, 69);
+            label.BorderStyle = BorderStyle.FixedSingle;
+            return label;
+        }
+
+        private async Task RunUpdateFlowAsync()
+        {
+            if (_isRunning)
+            {
+                return;
+            }
+
+            _isRunning = true;
+            _actionButton.Enabled = false;
+            _actionButton.Text = "Please wait...";
+
+            try
+            {
+                ResetStepState();
+                SetStepState(_stepCheck, "active");
+                SetStatus("Checking for update package...");
+                SetProgressMarquee("Checking");
+
+                UpdatePackage package = await ResolveUpdatePackageAsync();
+
+                if (package == null)
+                {
+                    throw new InvalidOperationException("Unable to resolve update package.");
+                }
+
+                _latestValue.Text = package.Version;
+                _releaseValue.Text = string.IsNullOrWhiteSpace(package.ReleaseDate) ? "-" : package.ReleaseDate;
+
+                if (CompareVersions(package.Version, CurrentVersion) <= 0)
+                {
+                    SetStepState(_stepCheck, "done");
+                    SetStatus("Already up to date. No action required.");
+                    SetProgressValue(100, "Up to date");
+                    _actionButton.Enabled = true;
+                    _actionButton.Text = "Finish";
+                    _isRunning = false;
+                    return;
+                }
+
+                SetStepState(_stepCheck, "done");
+                SetStepState(_stepDownload, "active");
+                SetStatus("Downloading update file...");
+                string downloadedFile = await DownloadPackageAsync(package);
+                SetStepState(_stepDownload, "done");
+
+                SetStepState(_stepInstall, "active");
+                SetProgressMarquee("Installing");
+                await LaunchInstallerAsync(downloadedFile);
+                SetStepState(_stepInstall, "done");
+
+                SetStatus("Update downloaded and launched successfully.");
+                SetProgressValue(100, "Complete");
+                _actionButton.Enabled = true;
+                _actionButton.Text = "Finish";
+            }
+            catch (Exception ex)
+            {
+                ResetStepState();
+                SetStepState(_stepCheck, "error");
+                SetStatus("Update failed: " + NormalizeErrorMessage(ex.Message), true);
+                SetProgressValue(0, "Failed");
+                _actionButton.Enabled = true;
+                _actionButton.Text = "Retry";
+            }
+
+            _isRunning = false;
+        }
+
+        private async Task<UpdatePackage> ResolveUpdatePackageAsync()
+        {
+            UpdatePackage fromRelease = await TryResolveFromGithubReleaseAsync();
+            if (fromRelease != null)
+            {
+                return fromRelease;
+            }
+            return await TryResolveFromManifestAsync();
+        }
+
+        private async Task<UpdatePackage> TryResolveFromGithubReleaseAsync()
+        {
+            try
+            {
+                string json = await DownloadStringAsync(ReleaseApiUrl);
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
+                IDictionary<string, object> release = serializer.DeserializeObject(json) as IDictionary<string, object>;
+                if (release == null)
+                {
+                    return null;
+                }
+
+                string version = NormalizeVersion(ReadString(release, "tag_name"));
+                string releaseDate = ReadString(release, "published_at");
+
+                object assetsObj;
+                if (!release.TryGetValue("assets", out assetsObj))
+                {
+                    return null;
+                }
+
+                IList assets = assetsObj as IList;
+                if (assets == null || assets.Count == 0)
+                {
+                    return null;
+                }
+
+                string bestUrl = null;
+                string bestName = null;
+
+                for (int i = 0; i < assets.Count; i++)
+                {
+                    IDictionary<string, object> asset = assets[i] as IDictionary<string, object>;
+                    if (asset == null)
+                    {
+                        continue;
+                    }
+
+                    string assetName = ReadString(asset, "name");
+                    string assetUrl = ReadString(asset, "browser_download_url");
+                    if (string.IsNullOrWhiteSpace(assetName) || string.IsNullOrWhiteSpace(assetUrl))
+                    {
+                        continue;
+                    }
+
+                    if (assetName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        bestName = assetName;
+                        bestUrl = assetUrl;
+                        if (assetName.StartsWith("RD-Checker-Updater-Setup", StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(bestUrl))
+                {
+                    return null;
+                }
+
+                return new UpdatePackage
+                {
+                    Version = string.IsNullOrWhiteSpace(version) ? CurrentVersion : version,
+                    DownloadUrl = bestUrl,
+                    FileName = bestName,
+                    ReleaseDate = NormalizeDate(releaseDate)
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private async Task<UpdatePackage> TryResolveFromManifestAsync()
+        {
+            string json = await DownloadStringAsync(ManifestUrl);
+            JavaScriptSerializer serializer = new JavaScriptSerializer();
+            IDictionary<string, object> manifest = serializer.DeserializeObject(json) as IDictionary<string, object>;
+            if (manifest == null)
+            {
+                throw new InvalidOperationException("Invalid update manifest format.");
+            }
+
+            string version = NormalizeVersion(ReadString(manifest, "version"));
+            string downloadUrl = ReadString(manifest, "package_url");
+            string fileName = ReadString(manifest, "package_name");
+            string releaseDate = NormalizeDate(ReadString(manifest, "release_date"));
+
+            if (string.IsNullOrWhiteSpace(version) || string.IsNullOrWhiteSpace(downloadUrl))
+            {
+                throw new InvalidOperationException("Manifest missing required fields.");
+            }
+
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                Uri uri = new Uri(downloadUrl);
+                fileName = Path.GetFileName(uri.LocalPath);
+                if (string.IsNullOrWhiteSpace(fileName))
+                {
+                    fileName = "rd-checker-update.bin";
+                }
+            }
+
+            return new UpdatePackage
+            {
+                Version = version,
+                DownloadUrl = downloadUrl,
+                FileName = fileName,
+                ReleaseDate = releaseDate
+            };
+        }
+
+        private async Task<string> DownloadPackageAsync(UpdatePackage package)
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "RDCheckerUpdater");
+            Directory.CreateDirectory(tempDir);
+
+            string fileName = package.FileName;
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                fileName = "RD-Checker-Update-" + package.Version + ".bin";
+            }
+
+            string targetPath = Path.Combine(tempDir, fileName);
+            if (File.Exists(targetPath))
+            {
+                File.Delete(targetPath);
+            }
+
+            using (WebClient client = CreateWebClient())
+            {
+                TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+
+                client.DownloadProgressChanged += (sender, args) =>
+                {
+                    SetProgressValue(args.ProgressPercentage, "Downloading");
+                };
+
+                client.DownloadFileCompleted += (sender, args) =>
+                {
+                    if (args.Cancelled)
+                    {
+                        tcs.TrySetException(new InvalidOperationException("Download cancelled."));
+                        return;
+                    }
+
+                    if (args.Error != null)
+                    {
+                        tcs.TrySetException(args.Error);
+                        return;
+                    }
+
+                    tcs.TrySetResult(true);
+                };
+
+                client.DownloadFileAsync(new Uri(package.DownloadUrl), targetPath);
+                await tcs.Task;
+            }
+
+            return targetPath;
+        }
+
+        private Task LaunchInstallerAsync(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                throw new FileNotFoundException("Downloaded file not found.", filePath);
+            }
+
+            SetStatus("Launching installer...");
+
+            ProcessStartInfo startInfo = new ProcessStartInfo(filePath);
+            startInfo.UseShellExecute = true;
+            Process.Start(startInfo);
+            return Task.FromResult(0);
+        }
+
+        private async Task<string> DownloadStringAsync(string url)
+        {
+            using (WebClient client = CreateWebClient())
+            {
+                return await client.DownloadStringTaskAsync(url);
+            }
+        }
+
+        private static WebClient CreateWebClient()
+        {
+            WebClient client = new WebClient();
+            client.Headers["User-Agent"] = "RDCheckerNativeUpdater";
+            client.Encoding = System.Text.Encoding.UTF8;
+            return client;
+        }
+
+        private void SetStatus(string message, bool isError)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string, bool>(SetStatus), message, isError);
+                return;
+            }
+
+            _statusLabel.Text = message;
+            _statusLabel.ForeColor = isError ? Color.FromArgb(182, 48, 37) : Color.FromArgb(58, 74, 98);
+        }
+
+        private void SetStatus(string message)
+        {
+            SetStatus(message, false);
+        }
+
+        private void SetProgressMarquee(string title)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string>(SetProgressMarquee), title);
+                return;
+            }
+
+            _progressBar.Style = ProgressBarStyle.Marquee;
+            _progressBar.MarqueeAnimationSpeed = 22;
+            _progressLabel.Text = title + " - ...";
+        }
+
+        private void SetProgressValue(int value, string title)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<int, string>(SetProgressValue), value, title);
+                return;
+            }
+
+            if (_progressBar.Style != ProgressBarStyle.Continuous)
+            {
+                _progressBar.Style = ProgressBarStyle.Continuous;
+            }
+
+            int safe = Math.Max(0, Math.Min(100, value));
+            _progressBar.Value = safe;
+            _progressLabel.Text = title + " - " + safe.ToString(CultureInfo.InvariantCulture) + "%";
+        }
+
+        private void ResetStepState()
+        {
+            SetStepState(_stepCheck, "pending");
+            SetStepState(_stepDownload, "pending");
+            SetStepState(_stepInstall, "pending");
+        }
+
+        private static void SetStepState(Label label, string state)
+        {
+            if (label == null)
+            {
+                return;
+            }
+
+            if (state == "active")
+            {
+                label.BackColor = Color.FromArgb(43, 124, 224);
+                label.ForeColor = Color.White;
+                return;
+            }
+
+            if (state == "done")
+            {
+                label.BackColor = Color.FromArgb(33, 138, 95);
+                label.ForeColor = Color.White;
+                return;
+            }
+
+            if (state == "error")
+            {
+                label.BackColor = Color.FromArgb(182, 58, 47);
+                label.ForeColor = Color.White;
+                return;
+            }
+
+            label.BackColor = Color.FromArgb(246, 249, 253);
+            label.ForeColor = Color.FromArgb(103, 120, 143);
+        }
+
+        private void ActionButton_Click(object sender, EventArgs e)
+        {
+            if (_isRunning)
+            {
+                return;
+            }
+
+            if (_actionButton.Text.Equals("Retry", StringComparison.OrdinalIgnoreCase))
+            {
+                Task.Run(async () => await RunUpdateFlowAsync());
+                return;
+            }
+
+            Close();
+        }
+
+        private static string ReadString(IDictionary<string, object> dict, string key)
+        {
+            if (dict == null)
+            {
+                return null;
+            }
+
+            object value;
+            if (!dict.TryGetValue(key, out value) || value == null)
+            {
+                return null;
+            }
+
+            return Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
+
+        private static string NormalizeVersion(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            string normalized = value.Trim();
+            if (normalized.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(1);
+            }
+            return normalized;
+        }
+
+        private static string NormalizeDate(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "-";
+            }
+
+            DateTime parsed;
+            if (DateTime.TryParse(value, out parsed))
+            {
+                return parsed.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            }
+
+            return value;
+        }
+
+        private static string NormalizeErrorMessage(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return "Unknown error.";
+            }
+
+            if (text.IndexOf("No published versions on GitHub", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "No published GitHub Release found yet.";
+            }
+
+            return text;
+        }
+
+        private static int CompareVersions(string left, string right)
+        {
+            int[] a = ParseVersion(left);
+            int[] b = ParseVersion(right);
+
+            int length = Math.Max(a.Length, b.Length);
+            for (int i = 0; i < length; i++)
+            {
+                int av = i < a.Length ? a[i] : 0;
+                int bv = i < b.Length ? b[i] : 0;
+                if (av > bv)
+                {
+                    return 1;
+                }
+                if (av < bv)
+                {
+                    return -1;
+                }
+            }
+            return 0;
+        }
+
+        private static int[] ParseVersion(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return new[] { 0 };
+            }
+
+            string[] parts = value.Split('.');
+            int[] output = new int[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string digits = Regex.Replace(parts[i], @"[^\d]", string.Empty);
+                int parsed;
+                if (!int.TryParse(digits, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
+                {
+                    parsed = 0;
+                }
+                output[i] = parsed;
+            }
+            return output;
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ReleaseCapture();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
+
+        private void TitleBar_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                ReleaseCapture();
+                SendMessage(Handle, 0xA1, 0x2, 0);
+            }
+        }
+    }
+}
