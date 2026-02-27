@@ -37,6 +37,6 @@ Output:
 - `updater-desktop/dist-exe/RD-Checker-Updater-Setup-1.1.0.exe`
 
 Installed app can update itself:
-1. Click `Check for Update`
-2. Click `Update Now`
-3. Click `Install and Restart`
+1. Run `RD-Checker-Updater-Setup-<version>.exe`
+2. App checks/downloads/installs update automatically
+3. App restarts itself when update is completed

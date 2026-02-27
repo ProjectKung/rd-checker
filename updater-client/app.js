@@ -30,7 +30,10 @@ const state = {
   desktop: {
     hasUpdate: false,
     downloaded: false,
-    unsubscribe: null
+    unsubscribe: null,
+    autoMode: true,
+    autoDownloadTriggered: false,
+    autoInstallTriggered: false
   }
 };
 
@@ -78,9 +81,13 @@ async function init() {
     state.installedVersion = version || CONFIG.defaultVersion;
     ui.installedVersion.textContent = state.installedVersion;
     ui.latestVersion.textContent = state.installedVersion;
-    renderNotes(["Desktop auto-update is enabled for installed build."]);
-    setStatus("Ready. Click 'Check for Update'.", false);
+    renderNotes(["Desktop auto-update is enabled. App can check, download, and install update automatically."]);
+    setStatus("Auto update mode started. Checking latest version...", false);
     setProgress(0, "Idle");
+
+    setTimeout(() => {
+      void handleDesktopCheckUpdate({ auto: true });
+    }, 350);
     return;
   }
 
@@ -107,20 +114,26 @@ async function handleUpdateNow() {
   await handleWebUpdateNow();
 }
 
-async function handleDesktopCheckUpdate() {
+async function handleDesktopCheckUpdate(options = {}) {
+  const auto = Boolean(options.auto);
   ui.checkBtn.disabled = true;
   ui.updateBtn.disabled = true;
   ui.updateBtn.textContent = "Update Now";
   state.desktop.hasUpdate = false;
   state.desktop.downloaded = false;
+  state.desktop.autoDownloadTriggered = false;
+  state.desktop.autoInstallTriggered = false;
   setProgress(0, "Checking");
-  setStatus("Checking for update from GitHub Releases...", false);
+  setStatus(auto ? "Auto checking for update..." : "Checking for update from GitHub Releases...", false);
 
   const result = await window.desktopUpdater.checkForUpdates();
   if (!result || !result.ok) {
     setStatus(`Update check failed: ${(result && result.error) || "Unknown error"}`, true);
     setProgress(0, "Failed");
     ui.checkBtn.disabled = false;
+    ui.updateBtn.disabled = true;
+    ui.downloadMeta.hidden = false;
+    ui.downloadMeta.textContent = "Auto mode failed. You can still click 'Check for Update'.";
   }
 }
 
@@ -154,6 +167,27 @@ async function handleDesktopUpdateNow() {
   }
 }
 
+async function triggerDesktopAutoDownload() {
+  const result = await window.desktopUpdater.downloadUpdate();
+  if (!result || !result.ok) {
+    setStatus(`Download failed: ${(result && result.error) || "Unknown error"}`, true);
+    setProgress(0, "Failed");
+    ui.checkBtn.disabled = false;
+    ui.updateBtn.disabled = false;
+    ui.updateBtn.textContent = "Update Now";
+  }
+}
+
+async function triggerDesktopAutoInstall() {
+  const result = await window.desktopUpdater.installUpdate();
+  if (!result || !result.ok) {
+    setStatus(`Install failed: ${(result && result.error) || "Unknown error"}`, true);
+    ui.checkBtn.disabled = false;
+    ui.updateBtn.disabled = false;
+    ui.updateBtn.textContent = "Install and Restart";
+  }
+}
+
 function handleDesktopUpdaterEvent(event) {
   if (!event || !event.type) {
     return;
@@ -175,10 +209,20 @@ function handleDesktopUpdaterEvent(event) {
       setStatus(`Update available: ${manifest.version}`, false);
       setProgress(0, "Ready to download");
       ui.downloadMeta.hidden = false;
-      ui.downloadMeta.textContent = "Release found. Click 'Update Now'.";
+      ui.downloadMeta.textContent = "Release found.";
       ui.checkBtn.disabled = false;
       ui.updateBtn.disabled = false;
       ui.updateBtn.textContent = "Update Now";
+
+      if (state.desktop.autoMode && !state.desktop.autoDownloadTriggered) {
+        state.desktop.autoDownloadTriggered = true;
+        ui.checkBtn.disabled = true;
+        ui.updateBtn.disabled = true;
+        setStatus(`Update available: ${manifest.version}. Auto downloading...`, false);
+        setProgress(0, "Starting download");
+        ui.downloadMeta.textContent = "Auto mode: downloading update package...";
+        void triggerDesktopAutoDownload();
+      }
       break;
     }
 
@@ -220,8 +264,23 @@ function handleDesktopUpdaterEvent(event) {
       ui.checkBtn.disabled = false;
       ui.updateBtn.disabled = false;
       ui.updateBtn.textContent = "Install and Restart";
-      ui.successMessage.textContent = `Version ${manifest.version} downloaded. Click Install and Restart.`;
-      ui.successPanel.hidden = false;
+
+      if (state.desktop.autoMode && !state.desktop.autoInstallTriggered) {
+        state.desktop.autoInstallTriggered = true;
+        ui.checkBtn.disabled = true;
+        ui.updateBtn.disabled = true;
+        ui.updateBtn.textContent = "Installing...";
+        setStatus("Download complete. Auto installing and restarting...", false);
+        ui.downloadMeta.textContent = "Auto mode: installing update and restarting app...";
+        ui.successMessage.textContent = `Version ${manifest.version} downloaded. Installing now...`;
+        ui.successPanel.hidden = false;
+        setTimeout(() => {
+          void triggerDesktopAutoInstall();
+        }, 1000);
+      } else {
+        ui.successMessage.textContent = `Version ${manifest.version} downloaded. Click Install and Restart.`;
+        ui.successPanel.hidden = false;
+      }
       break;
     }
 

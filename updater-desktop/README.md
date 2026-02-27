@@ -23,10 +23,12 @@ Output will be in `updater-desktop/dist-exe/` as:
 ## In-App Update Flow (Installed App)
 
 1. Install and open `RD Checker Updater`
-2. Click `Check for Update`
-3. If update exists, click `Update Now`
-4. Wait until download reaches 100%
-5. Click `Install and Restart`
+2. App auto-checks update immediately
+3. If update exists, app auto-downloads and auto-installs
+4. App restarts itself after update is installed
+
+User side does not need terminal commands. They only run:
+- `RD-Checker-Updater-Setup-<version>.exe`
 
 ## GitHub Release Publish (for real update delivery)
 
