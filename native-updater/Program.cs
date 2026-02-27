@@ -166,6 +166,8 @@ namespace RDCheckerNativeUpdater
     internal sealed class UpdaterForm : Form
     {
         private const string CurrentVersion = "1.1.5";
+        private const string CurrentBuildCommit = "91cd2bc";
+        private const string CurrentBuildMessage = "fix: resolve stale update source and bump to 1.1.5";
         private const string ReleaseApiUrl = "https://api.github.com/repos/ProjectKung/rd-checker/releases/latest";
         private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/HEAD/updater/update-manifest.json";
 
@@ -178,6 +180,7 @@ namespace RDCheckerNativeUpdater
         private Label _installedValue;
         private Label _latestValue;
         private Label _releaseValue;
+        private Label _buildInfoValue;
         private Button _actionButton;
 
         private bool _isRunning;
@@ -302,6 +305,17 @@ namespace RDCheckerNativeUpdater
             _releaseValue.Location = new Point(372, 176);
             body.Controls.Add(_releaseValue);
 
+            Label buildKey = BuildMetaKeyLabel("Current Build");
+            buildKey.AutoSize = false;
+            buildKey.Size = new Size(522, 18);
+            buildKey.TextAlign = ContentAlignment.MiddleLeft;
+            buildKey.Location = new Point(16, 212);
+            body.Controls.Add(buildKey);
+
+            _buildInfoValue = BuildBuildInfoValueLabel(BuildCurrentBuildText());
+            _buildInfoValue.Location = new Point(16, 232);
+            body.Controls.Add(_buildInfoValue);
+
             _actionButton = new Button();
             _actionButton.Text = "Please wait...";
             _actionButton.Enabled = false;
@@ -340,6 +354,26 @@ namespace RDCheckerNativeUpdater
             label.ForeColor = Color.FromArgb(32, 46, 69);
             label.BorderStyle = BorderStyle.FixedSingle;
             return label;
+        }
+
+        private static Label BuildBuildInfoValueLabel(string text)
+        {
+            Label label = new Label();
+            label.Text = text;
+            label.AutoSize = false;
+            label.Size = new Size(522, 54);
+            label.Padding = new Padding(8, 6, 8, 6);
+            label.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+            label.ForeColor = Color.FromArgb(47, 63, 88);
+            label.BackColor = Color.FromArgb(248, 250, 253);
+            label.BorderStyle = BorderStyle.FixedSingle;
+            label.TextAlign = ContentAlignment.TopLeft;
+            return label;
+        }
+
+        private static string BuildCurrentBuildText()
+        {
+            return "Version " + CurrentVersion + " (" + CurrentBuildCommit + ")" + Environment.NewLine + CurrentBuildMessage;
         }
 
         private async Task RunUpdateFlowAsync()
