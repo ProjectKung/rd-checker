@@ -1,5 +1,10 @@
 # RD Checker Changelog
 
+## 1.1.7 - 2026-02-27
+- Changed RD Checker popup default mode to "เช็คทั้งหมด" (`checkModeAll`).
+- Updated updater build note text for this release.
+- Bumped extension/updater release to `1.1.7`.
+
 ## 1.1.6 - 2026-02-27
 - Updated Current Build display text to avoid stale commit-hash confusion.
 - Bumped updater package version to `1.1.6` so clients on `1.1.5` can auto-update.

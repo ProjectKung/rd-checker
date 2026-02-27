@@ -1,12 +1,12 @@
 {
-  "version": "1.1.6",
+  "version": "1.1.7",
   "release_date": "2026-02-27",
   "package_name": "RD-Checker-Updater-Setup.exe",
   "package_url": "https://raw.githubusercontent.com/ProjectKung/rd-checker/HEAD/updater/RD-Checker-Updater-Setup.exe",
   "package_size": "auto",
   "notes": [
-    "Release 1.1.6: sync current build note display with latest package.",
-    "Current Build now shows readable version + build note in updater UI.",
+    "Release 1.1.7: default RD Checker popup mode is now Check All.",
+    "Current Build text updated to the 1.1.7 release note.",
     "Updater keeps self-replace and auto-restart behavior with single fixed executable package name."
   ]
 }
