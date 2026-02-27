@@ -6,8 +6,8 @@ RD Checker consists of:
 
 ## Current Versions
 
-- Extension version: `1.1.9`
-- Native updater version: `1.1.9`
+- Extension version: `1.1.10`
+- Native updater version: `1.1.10`
 
 ## Updater Package Policy
 
@@ -41,4 +41,3 @@ When you run `RD-Checker-Updater-Setup.exe`:
   - `RD-Checker-Updater-Setup.exe`
   - `updater/RD-Checker-Updater-Setup.exe`
 - Temporary compiler artifacts (`CSC*.TMP`) are not runtime files and should be cleaned.
-

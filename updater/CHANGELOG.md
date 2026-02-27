@@ -1,5 +1,9 @@
 # RD Checker Changelog
 
+## 1.1.10 - 2026-02-27
+- Version bump to `1.1.10`.
+- Kept updater full-folder sync behavior from GitHub `main`.
+
 ## 1.1.9 - 2026-02-27
 - Added full project-folder sync from GitHub `main` when updater is already on latest version.
 - Updater now refreshes extension files in the installed directory, not only its own EXE.
