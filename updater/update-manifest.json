@@ -1,0 +1,13 @@
+{
+  "version": "1.1.0",
+  "release_date": "2026-02-27",
+  "package_name": "rd-checker-1.1.0.zip",
+  "package_url": "https://github.com/ProjectKung/rd-checker/archive/refs/heads/main.zip",
+  "package_size": "auto",
+  "notes": [
+    "Added standalone updater client (updater-client/index.html).",
+    "Added game-style update flow: progress bar + live status text.",
+    "Added patch-note panel to explain what changed before updating.",
+    "Added successful completion screen after update package download."
+  ]
+}

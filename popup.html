@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RD Checker</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+
+<body>
+  <div class="container">
+    <h1 class="title-with-logo">
+      <img src="RDICON.png" alt="RD Icon" class="rd-logo" />
+      <span>RD Checker</span>
+      <img src="RDICON.png" alt="RD Icon" class="rd-logo" />
+    </h1>
+
+    <!-- ✅ Toggle (Uiverse.io by Galahhad) -->
+    <div class="topbar">
+      <span class="theme-label">Change Theme :</span>
+
+      <label class="theme-switch" title="สลับโหมด">
+        <input id="themeToggleCheckbox" type="checkbox" class="theme-switch__checkbox" aria-label="สลับโหมดมืด/สว่าง">
+        <div class="theme-switch__container">
+          <div class="theme-switch__clouds"></div>
+
+          <div class="theme-switch__stars-container" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 55" fill="none">
+              <path fill-rule="evenodd" clip-rule="evenodd"
+                d="M135.831 3.00688C135.055 3.85027 134.111 4.29946 133 4.35447C134.111 4.40947 135.055 4.85867 135.831 5.71123C136.607 6.55462 136.996 7.56303 136.996 8.72727C136.996 7.95722 137.172 7.25134 137.525 6.59129C137.886 5.93124 138.372 5.39954 138.98 5.00535C139.598 4.60199 140.268 4.39114 141 4.35447C139.88 4.2903 138.936 3.85027 138.16 3.00688C137.384 2.16348 136.996 1.16425 136.996 0C136.996 1.16425 136.607 2.16348 135.831 3.00688Z"
+                fill="currentColor"></path>
+            </svg>
+          </div>
+
+          <div class="theme-switch__circle-container" aria-hidden="true">
+            <div class="theme-switch__sun-moon-container">
+              <div class="theme-switch__moon">
+                <div class="theme-switch__spot"></div>
+                <div class="theme-switch__spot"></div>
+                <div class="theme-switch__spot"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </label>
+    </div>
+
+    <!-- ===== Check Scope Toggle (All vs Single) ===== -->
+    <div class="mode-toggle mode-toggle-4 check-mode-toggle" role="radiogroup" aria-label="เลือกโหมดการตรวจสอบ">
+      <input id="checkModeAll" type="radio" name="checkMode" value="ALL">
+      <label for="checkModeAll" class="mode-pill">
+        <span class="mode-dot" aria-hidden="true"></span>
+        <span class="mode-text">เช็คทั้งหมด</span>
+      </label>
+
+      <input id="checkModeSingle" type="radio" name="checkMode" value="SINGLE">
+      <label for="checkModeSingle" class="mode-pill">
+        <span class="mode-dot" aria-hidden="true"></span>
+        <span class="mode-text">เช็คแบบเดี่ยว</span>
+      </label>
+
+      <input id="checkModeIpPhone" type="radio" name="checkMode" value="IPPHONE" checked>
+      <label for="checkModeIpPhone" class="mode-pill">
+        <span class="mode-dot" aria-hidden="true"></span>
+        <span class="mode-text">เช็ครูป IP Phone</span>
+      </label>
+
+      <input id="checkModePdf" type="radio" name="checkMode" value="PDFCHECK">
+      <label for="checkModePdf" class="mode-pill">
+        <span class="mode-dot" aria-hidden="true"></span>
+        <span class="mode-text">เช็ค pdf</span>
+      </label>
+
+      <span class="mode-glider" aria-hidden="true"></span>
+    </div>
+
+
+    <!-- =========================
+         1) PDF SECTION (ติดกับ pdfResults)
+         ========================= -->
+    <div class="section" id="pdfSection">
+      <h2>📄 รายงานการบำรุงรักษาอุปกรณ์เครือข่ายคอมพิวเตอร์</h2>
+
+      <input type="text" id="pdfFile"
+        placeholder="Path ไฟล์ (file:///C:/...) หรือ URL (https://manetwork.rd.go.th/.../file.pdf)" />
+
+      <button id="extractPdfBtn">
+        Extract PDF Data
+      </button>
+      <div id="extractPdfLoadingBar" class="loading-bar" hidden></div>
+
+      <!-- ✅ pdfResults “ติด” กับ PDF section -->
+      <div id="pdfResults" class="results" style="display:none;">
+        <details>
+          <summary>
+            ไฟล์ใบงาน / PDF Results (คลิกเพื่อดู)
+          </summary>
+          <div style="margin-top: 8px;">
+            <p><strong>เจ้าหน้าที่บริษัท:</strong> <span id="companyOfficer">-</span></p>
+            <p><strong>RD Code:</strong> <span id="rdCode">-</span></p>
+            <p><strong>วันที่ดำเนินเสร็จ(ว/ด/ป) :</strong> <span id="completionDate">-</span></p>
+            <p><strong>Software Version:</strong> <span id="softwareVersion">-</span></p>
+
+            <details style="margin-top: 10px;">
+              <summary>📄 Text Preview (Debug)</summary>
+              <textarea id="textPreview" readonly></textarea>
+            </details>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- =========================
+         2) WEB/LOG SECTION (ติดกับ webResults)
+         ========================= -->
+    <div class="section" id="logSection">
+      <h2>Log Switch GUI / CLI</h2>
+
+      <div class="mode-toggle" role="radiogroup" aria-label="เลือกโหมด Log">
+        <input id="modeGUI" type="radio" name="mode" value="GUI" checked>
+        <label for="modeGUI" class="mode-pill">
+          <span class="mode-dot" aria-hidden="true"></span>
+          <span class="mode-text">GUI</span>
+        </label>
+
+        <input id="modeCLI" type="radio" name="mode" value="CLI">
+        <label for="modeCLI" class="mode-pill">
+          <span class="mode-dot" aria-hidden="true"></span>
+          <span class="mode-text">CLI</span>
+        </label>
+
+        <span class="mode-glider" aria-hidden="true"></span>
+      </div>
+
+      <input type="text" id="websiteUrl"
+        placeholder="URL หรือ path ไฟล์ (เช่น file:///C:/path/to/file.html) สำหรับทดสอบ" />
+      <button id="extractWebBtn">Extract Website Data</button>
+      <div id="extractWebLoadingBar" class="loading-bar" hidden></div>
+
+      <!-- ✅ webResults “ติด” กับ Log section -->
+      <div id="webResults" class="results" style="display:none;">
+        <details>
+          <summary>
+            Log Switch GUI / CLI Results (คลิกเพื่อดู)
+          </summary>
+          <div style="margin-top: 8px;">
+            <p><strong>Last Time :</strong> <span id="webTimestamp">-</span></p>
+            <p><strong>เวลาระหว่าง 2 กับ 3 :</strong> <span id="timeBetween23">-</span></p>
+            <p><strong>Interface counters :</strong> <span id="interfaceCountersStatus">-</span></p>
+            <p><strong>Detect "Clear counters" :</strong> <span id="clearCountersStatus">-</span></p>
+            <p><strong>Detect "Clear" :</strong> <span id="clearStatus">-</span></p>
+            <p><strong>Software Version:</strong> <span id="webVersion">-</span></p>
+
+            <!-- Last page preview / Leaf prompt detection (GUI PDF only) -->
+            <details id="lastPagePreviewDetails" style="margin-top: 10px; display:none;">
+              <summary>Last Page Preview</summary>
+              <div style="margin-top: 8px;">
+                <div class="pdf-preview-meta">
+                  <div class="pdf-preview-meta-row">
+                    <span class="pdf-preview-meta-label">Prompt Text:</span>
+                    <span id="leafPromptText" class="pdf-preview-meta-value">-</span>
+                  </div>
+                  <div class="pdf-preview-meta-row pdf-preview-meta-row--small">
+                    <span class="pdf-preview-meta-label">Last Page:</span>
+                    <span id="lastPageInfo" class="pdf-preview-meta-value">-</span>
+                  </div>
+                </div>
+
+                <div class="pdf-preview">
+                  <div class="pdf-preview-viewport" id="lastPageViewport">
+                    <img id="lastPageImage" alt="Last page preview" draggable="false" />
+                  </div>
+
+                  <div class="pdf-preview-controls" aria-label="Last page zoom controls">
+                    <span class="pdf-preview-zoom-left">Zoom</span>
+                    <input type="range" id="lastPageZoom" min="100" max="500" value="100" />
+                    <span id="lastPageZoomLabel" class="pdf-preview-zoom-label">100%</span>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <details style="margin-top: 10px;">
+              <summary>🔍 Debug Info (Website)</summary>
+              <textarea id="webDebug" readonly></textarea>
+            </details>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- =========================
+         3) COMPARISON SECTION (ต้องห่างจาก webResults)
+         ========================= -->
+    
+    <!-- =========================
+         Debug URLs (PM Title -> Chain 5 Steps)
+    ========================== -->
+    <div class="section" id="pmDebugSection">
+      <h2>🧩 Comparison Results จาก PM Title (ทุกหน้า)</h2>
+
+      <div class="hint-box">
+        โหมดนี้จะไล่ “ทุกหน้า” แล้วสร้าง chain 5 ขั้นต่อ 1 รายการ: pm_title → pm_editcall_approve_device → rack_detail_TOR → router_product → view_configuration
+จากนั้นจะรัน Compare ให้ “แต่ละรายการ” ทันที โดยใช้:
+• 5) view_configuration → ช่อง Website/Log (id="websiteUrl")
+• PDF → ช่อง PDF (id="pdfFile")
+และแสดงผลเป็น Comparison Results แยกการ์ด (Debug URLs จะอยู่ท้ายการ์ด)
+      </div>
+
+      <input id="pmTitleUrl" type="text"
+        placeholder="วางลิงก์ pm_title.php?... (เช่น https://10.3.10.43/.../pm_title.php?status=wait)"
+        autocomplete="off" />
+      <div class="mode-toggle" role="radiogroup" aria-label="เลือกโหมดสำหรับ Compare (GUI/CLI)" style="margin-top:10px;">
+        <input id="pmModeGUI" type="radio" name="pmMode" value="GUI" checked>
+        <label for="pmModeGUI" class="mode-pill">
+          <span class="mode-dot" aria-hidden="true"></span>
+          <span class="mode-text">GUI</span>
+        </label>
+
+        <input id="pmModeCLI" type="radio" name="pmMode" value="CLI">
+        <label for="pmModeCLI" class="mode-pill">
+          <span class="mode-dot" aria-hidden="true"></span>
+          <span class="mode-text">CLI</span>
+        </label>
+
+        <span class="mode-glider" aria-hidden="true"></span>
+      </div>
+
+
+       <div class="debug-btn-row">
+         <button id="debugUrlsBtn">Compare (Chain 5 ขั้น)</button>
+         <button id="stopDebugBtn" style="display:none;">Stop</button>
+       </div>
+ 
+       <div id="debugProgress" class="loading-text" style="display:block; margin-top:6px;"></div>
+       <div id="debugSummary" class="loading-text" style="display:none; margin-top:6px;"></div>
+       <div id="debugSummaryFilterMain" class="mode-toggle mode-toggle-3 debug-summary-filter" role="radiogroup" aria-label="กรองผลการเปรียบเทียบ" style="display:none; margin-top:6px;">
+         <input id="debugMainFilterAll" type="radio" name="debugStatusFilterMain" value="ALL" checked>
+         <label for="debugMainFilterAll" class="mode-pill">
+            <span class="mode-dot" aria-hidden="true"></span>
+            <span id="debugMainFilterAllText" class="mode-text">ทั้งหมด (0)</span>
+          </label>
+
+         <input id="debugMainFilterOK" type="radio" name="debugStatusFilterMain" value="OK">
+         <label for="debugMainFilterOK" class="mode-pill">
+            <span class="mode-dot" aria-hidden="true"></span>
+            <span id="debugMainFilterOKText" class="mode-text">ปกติ (0)</span>
+          </label>
+
+         <input id="debugMainFilterERR" type="radio" name="debugStatusFilterMain" value="ERR">
+         <label for="debugMainFilterERR" class="mode-pill">
+            <span class="mode-dot" aria-hidden="true"></span>
+            <span id="debugMainFilterERRText" class="mode-text">ผิดปกติ (0)</span>
+          </label>
+
+         <span class="mode-glider" aria-hidden="true"></span>
+       </div>
+       <div id="debugResults" class="debug-results" style="margin-top:10px;"></div>
+     </div>
+
+    <div class="section" id="ipPhoneSection" hidden>
+      <h2>📷 เช็ครูป IP Phone</h2>
+
+      <div class="hint-box">
+        วางลิงก์ <strong>pm_title.php</strong> แล้วระบบจะไล่รายการทีละตัว:
+        pm_title → pm_editcall_approve_device → rack_detail_IP/TOR → pic_ip_phone
+        และตรวจข้อมูลใบงาน PDF (เจ้าหน้าที่บริษัท / RD Code / วันที่ดำเนินเสร็จ / หมายเลขเครื่อง)
+      </div>
+
+      <input id="ipPhonePmTitleUrl" type="text"
+        placeholder="วางลิงก์ pm_title.php?... (เช่น https://10.3.10.43/.../pm_title.php?title=19&...)" autocomplete="off" />
+
+      <div class="debug-btn-row">
+        <button id="ipPhoneCheckBtn">เช็ครูป IP Phone</button>
+        <button id="ipPhoneStopBtn" style="display:none;">Stop</button>
+      </div>
+
+      <div id="ipPhoneProgress" class="loading-text" style="display:block; margin-top:6px;"></div>
+      <div id="ipPhoneSummary" class="loading-text" style="display:none; margin-top:6px;"></div>
+      <div id="ipPhonePager" class="ip-phone-pager" style="display:none;">
+        <button id="ipPhonePrevBtn" type="button" class="debug-mini-btn">ก่อนหน้า</button>
+        <div id="ipPhonePageInfo" class="ip-phone-page-info">หน้า 1</div>
+        <button id="ipPhoneNextBtn" type="button" class="debug-mini-btn">ถัดไป</button>
+      </div>
+      <div id="ipPhoneResults" class="debug-results" style="margin-top:10px;"></div>
+      <div id="ipPhonePagerBottom" class="ip-phone-pager" style="display:none;">
+        <button id="ipPhonePrevBtnBottom" type="button" class="debug-mini-btn">&#3585;&#3656;&#3629;&#3609;&#3627;&#3609;&#3657;&#3634;</button>
+        <div id="ipPhonePageInfoBottom" class="ip-phone-page-info">&#3627;&#3609;&#3657;&#3634; 1</div>
+        <button id="ipPhoneNextBtnBottom" type="button" class="debug-mini-btn">&#3606;&#3633;&#3604;&#3652;&#3611;</button>
+      </div>
+    </div>
+
+    <div class="section" id="pdfCheckSection" hidden>
+      <h2>📄 เช็ค pdf</h2>
+
+      <div class="hint-box">
+        วางลิงก์ <strong>pm_title.php</strong> แล้วระบบจะไล่รายการทีละตัว:
+        pm_title → pm_editcall_approve_device → rack_detail_TOR และตรวจเลข S/N ให้ตรงกันทั้ง 3 จุด
+        พร้อมดึงข้อมูลจากใบงาน PDF (เจ้าหน้าที่บริษัท / RD Code / หมายเลขเครื่อง)
+      </div>
+
+      <input id="pdfCheckPmTitleUrl" type="text"
+        placeholder="วางลิงก์ pm_title.php?... (เช่น https://10.3.10.43/.../pm_title.php?title=93&...)" autocomplete="off" />
+
+      <div class="debug-btn-row">
+        <button id="pdfCheckRunBtn">เช็ค pdf</button>
+        <button id="pdfCheckStopBtn" style="display:none;">Stop</button>
+      </div>
+      <div id="pdfCheckProgress" class="loading-text" style="display:block; margin-top:6px;"></div>
+      <div id="pdfCheckSummary" class="loading-text" style="display:none; margin-top:6px;"></div>
+      <div id="debugSummaryFilter" class="mode-toggle mode-toggle-3 debug-summary-filter" role="radiogroup" aria-label="Filter PDF Results" style="display:none; margin-top:6px;">
+        <input id="debugFilterAll" type="radio" name="pdfDebugStatusFilter" value="ALL" checked>
+        <label for="debugFilterAll" class="mode-pill">
+          <span class="mode-dot" aria-hidden="true"></span>
+          <span id="debugFilterAllText" class="mode-text">&#3607;&#3633;&#3657;&#3591;&#3627;&#3617;&#3604; (0)</span>
+        </label>
+        <input id="debugFilterOK" type="radio" name="pdfDebugStatusFilter" value="OK">
+        <label for="debugFilterOK" class="mode-pill">
+          <span class="mode-dot" aria-hidden="true"></span>
+          <span id="debugFilterOKText" class="mode-text">&#3611;&#3585;&#3605;&#3636; (0)</span>
+        </label>
+        <input id="debugFilterERR" type="radio" name="pdfDebugStatusFilter" value="ERR">
+        <label for="debugFilterERR" class="mode-pill">
+          <span class="mode-dot" aria-hidden="true"></span>
+          <span id="debugFilterERRText" class="mode-text">&#3612;&#3636;&#3604;&#3611;&#3585;&#3605;&#3636; (0)</span>
+        </label>
+        <span class="mode-glider" aria-hidden="true"></span>
+      </div>
+      <div id="pdfCheckPagerTop" class="ip-phone-pager" style="display:none;">
+        <button id="pdfCheckPrevBtnTop" type="button" class="debug-mini-btn">&#3585;&#3656;&#3629;&#3609;&#3627;&#3609;&#3657;&#3634;</button>
+        <div id="pdfCheckPageInfoTop" class="ip-phone-page-info">&#3627;&#3609;&#3657;&#3634; 1</div>
+        <button id="pdfCheckNextBtnTop" type="button" class="debug-mini-btn">&#3606;&#3633;&#3604;&#3652;&#3611;</button>
+      </div>
+      <div id="pdfCheckResults" class="debug-results" style="margin-top:10px;"></div>
+      <div id="pdfCheckPager" class="ip-phone-pager" style="display:none;">
+        <button id="pdfCheckPrevBtn" type="button" class="debug-mini-btn">ก่อนหน้า</button>
+        <div id="pdfCheckPageInfo" class="ip-phone-page-info">หน้า 1</div>
+        <button id="pdfCheckNextBtn" type="button" class="debug-mini-btn">ถัดไป</button>
+      </div>
+    </div>
+
+<div class="section" id="compareSection">
+      <h2>Comparison Results</h2>
+
+      <div class="hint-box">
+        💡 หากคุณใส่ลิงก์/พาธในช่อง <strong>“รายงานการบำรุงรักษาอุปกรณ์เครือข่ายคอมพิวเตอร์”</strong> และ
+        <strong>“Log Switch GUI / CLI”</strong>
+        แล้ว คุณสามารถกด <strong>“Compare Data”</strong> เพื่อเปรียบเทียบได้เลย
+      </div>
+
+      <button id="compareBtn">Compare Data</button>
+      <div id="compareLoadingBar" class="loading-bar" hidden></div>
+
+      <div id="compareInputWarning"
+        style="display:none;">
+      </div>
+
+      <div id="compareLoading" style="display:none;">
+        กำลังโหลดและเปรียบเทียบข้อมูล...
+      </div>
+
+      <!-- ✅ compareResults ติดกับ Comparison section เช่นเดียวกับส่วนอื่น -->
+      <div id="compareResults" class="results" style="display:none;">
+        <h3>Comparison:</h3>
+        <div class="result-item">
+          <p id="versionResult">-</p>
+        </div>
+        <div class="result-item">
+          <p id="timeResult">-</p>
+        </div>
+        <div class="result-item">
+          <p id="timeLogResult">-</p>
+        </div>
+        <div class="result-item">
+          <p id="crcResult">-</p>
+        </div>
+        <div class="result-item">
+          <p id="clearCountersResult">-</p>
+        </div>
+        <div class="result-item">
+          <p id="clearResult">-</p>
+        </div>
+        <div class="result-item result-item--manual" id="logPictureItem" style="display:none;">
+          <p id="logPictureResult">-</p>
+          <div id="logPictureNoPreview" class="cmp-manual" style="display:none; margin-top:8px;">
+            ❗ ยังไม่มีรูป Preview — ให้กด <strong>Extract Website Data</strong> ในโหมด <strong>GUI</strong> ก่อน แล้วค่อย Compare อีกครั้ง
+          </div>
+
+          <div id="logPicturePreview" class="pdf-preview" style="display:none;">
+            <div class="pdf-preview-meta">
+              <div class="pdf-preview-meta-row pdf-preview-meta-row--small">
+                <span class="pdf-preview-meta-label">LOG Picture Preview:</span>
+                <span id="logPictureInfo" class="pdf-preview-meta-value">-</span>
+              </div>
+            </div>
+
+            <div class="pdf-preview-viewport" id="logPictureViewport">
+              <img id="logPictureImage" alt="LOG picture preview" draggable="false" />
+            </div>
+
+            <div class="pdf-preview-controls" aria-label="LOG picture zoom controls">
+              <span class="pdf-preview-zoom-left">Zoom</span>
+              <input type="range" id="logPictureZoom" min="100" max="500" value="100" />
+              <span id="logPictureZoomLabel" class="pdf-preview-zoom-label">100%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="messages" class="messages"></div>
+  </div>
+
+  <script src="pdf.min.js"></script>
+  <script src="pdf-extractor.js"></script>
+  <script src="data-parser.js"></script>
+  <script src="popup.js"></script>
+  <script src="pm-pdf-check.js"></script>
+
+  <!-- ✅ Theme toggle logic -->
+  <script src="theme.js"></script>
+</body>
+
+</html>

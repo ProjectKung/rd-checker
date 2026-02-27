@@ -1,0 +1,7 @@
+dist/
+*.rar
+*.bak
+*.bak-*
+*.tmp
+tmp_*
+*.log

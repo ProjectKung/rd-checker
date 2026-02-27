@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "RD Checker",
+  "version": "1.1.0",
+  "description": "Compare PDF and website data for RD documents",
+
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "file:///*",
+    "https://83.118.111.105/*",
+    "https://manetwork.rd.go.th/*",
+    "<all_urls>"
+  ],
+
+  "action": {
+    "default_title": "RD Checker",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://83.118.111.105/*", "<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["pdf.worker.min.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
