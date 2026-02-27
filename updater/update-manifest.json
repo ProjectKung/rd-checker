@@ -1,12 +1,12 @@
 {
-  "version": "1.1.5",
+  "version": "1.1.6",
   "release_date": "2026-02-27",
   "package_name": "RD-Checker-Updater-Setup.exe",
   "package_url": "https://raw.githubusercontent.com/ProjectKung/rd-checker/HEAD/updater/RD-Checker-Updater-Setup.exe",
   "package_size": "auto",
   "notes": [
-    "Release 1.1.5: resolve updates from both Release API and manifest, then pick highest version.",
-    "Manifest and package URLs now use HEAD to reduce stale main-branch cache responses.",
+    "Release 1.1.6: sync current build note display with latest package.",
+    "Current Build now shows readable version + build note in updater UI.",
     "Updater keeps self-replace and auto-restart behavior with single fixed executable package name."
   ]
 }

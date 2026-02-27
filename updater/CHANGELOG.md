@@ -1,5 +1,10 @@
 # RD Checker Changelog
 
+## 1.1.6 - 2026-02-27
+- Updated Current Build display text to avoid stale commit-hash confusion.
+- Bumped updater package version to `1.1.6` so clients on `1.1.5` can auto-update.
+- Kept single-file updater package flow (`RD-Checker-Updater-Setup.exe`).
+
 ## 1.1.5 - 2026-02-27
 - Changed updater manifest source to `.../HEAD/updater/update-manifest.json` to avoid stale `main` cache.
 - Updater now resolves package from both GitHub Release API and manifest, then chooses the higher version.

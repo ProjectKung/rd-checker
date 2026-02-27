@@ -165,9 +165,8 @@ namespace RDCheckerNativeUpdater
 
     internal sealed class UpdaterForm : Form
     {
-        private const string CurrentVersion = "1.1.5";
-        private const string CurrentBuildCommit = "91cd2bc";
-        private const string CurrentBuildMessage = "fix: resolve stale update source and bump to 1.1.5";
+        private const string CurrentVersion = "1.1.6";
+        private const string CurrentBuildMessage = "fix: sync displayed build note and bump to 1.1.6";
         private const string ReleaseApiUrl = "https://api.github.com/repos/ProjectKung/rd-checker/releases/latest";
         private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/HEAD/updater/update-manifest.json";
 
@@ -373,7 +372,7 @@ namespace RDCheckerNativeUpdater
 
         private static string BuildCurrentBuildText()
         {
-            return "Version " + CurrentVersion + " (" + CurrentBuildCommit + ")" + Environment.NewLine + CurrentBuildMessage;
+            return "Version " + CurrentVersion + Environment.NewLine + CurrentBuildMessage;
         }
 
         private async Task RunUpdateFlowAsync()

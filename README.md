@@ -6,8 +6,8 @@ RD Checker consists of:
 
 ## Current Versions
 
-- Extension version: `1.1.5`
-- Native updater version: `1.1.5`
+- Extension version: `1.1.6`
+- Native updater version: `1.1.6`
 
 ## Updater Package Policy
 
