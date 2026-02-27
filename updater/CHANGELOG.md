@@ -1,5 +1,10 @@
 # RD Checker Changelog
 
+## 1.1.1 - 2026-02-27
+- Updated updater executable icon to use the new design.
+- Improved icon scaling so desktop icon appears larger and clearer.
+- Updated native build script to prioritize `native-updater/app-zoom.ico`.
+
 ## 1.1.0 - 2026-02-27
 - Added standalone updater client in `updater-client/`.
 - Added patch note rendering from `updater/update-manifest.json`.

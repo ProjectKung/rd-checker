@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
@@ -40,20 +39,16 @@ namespace RDCheckerNativeUpdater
 
     internal sealed class UpdaterForm : Form
     {
-        private const string CurrentVersion = "1.1.0";
+        private const string CurrentVersion = "1.1.1";
         private const string ReleaseApiUrl = "https://api.github.com/repos/ProjectKung/rd-checker/releases/latest";
         private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/update-manifest.json";
 
         private Panel _titleBar;
         private Label _titleLabel;
-        private Button _closeButton;
         private Label _headingLabel;
         private Label _statusLabel;
         private ProgressBar _progressBar;
         private Label _progressLabel;
-        private Label _stepCheck;
-        private Label _stepDownload;
-        private Label _stepInstall;
         private Label _installedValue;
         private Label _latestValue;
         private Label _releaseValue;
@@ -79,6 +74,15 @@ namespace RDCheckerNativeUpdater
 
         private void BuildUi()
         {
+            Panel body = new Panel();
+            body.Dock = DockStyle.None;
+            body.Location = new Point(0, 38);
+            body.Size = new Size(ClientSize.Width, ClientSize.Height - 38);
+            body.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            body.BackColor = Color.White;
+            body.Padding = new Padding(18, 14, 18, 14);
+            Controls.Add(body);
+
             _titleBar = new Panel();
             _titleBar.Dock = DockStyle.Top;
             _titleBar.Height = 38;
@@ -95,33 +99,11 @@ namespace RDCheckerNativeUpdater
             _titleLabel.MouseDown += TitleBar_MouseDown;
             _titleBar.Controls.Add(_titleLabel);
 
-            _closeButton = new Button();
-            _closeButton.FlatStyle = FlatStyle.Flat;
-            _closeButton.FlatAppearance.BorderSize = 0;
-            _closeButton.Text = "X";
-            _closeButton.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
-            _closeButton.ForeColor = Color.FromArgb(43, 56, 77);
-            _closeButton.Size = new Size(46, 38);
-            _closeButton.Location = new Point(ClientSize.Width - 46, 0);
-            _closeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _closeButton.BackColor = Color.Transparent;
-            _closeButton.Cursor = Cursors.Hand;
-            _closeButton.Click += (sender, args) => Close();
-            _closeButton.MouseEnter += (sender, args) => _closeButton.BackColor = Color.FromArgb(232, 45, 63);
-            _closeButton.MouseLeave += (sender, args) => _closeButton.BackColor = Color.Transparent;
-            _titleBar.Controls.Add(_closeButton);
-
-            Panel body = new Panel();
-            body.Dock = DockStyle.Fill;
-            body.BackColor = Color.White;
-            body.Padding = new Padding(18, 14, 18, 14);
-            Controls.Add(body);
-
             _headingLabel = new Label();
             _headingLabel.Text = "Preparing Update";
             _headingLabel.Font = new Font("Segoe UI", 20f, FontStyle.Bold);
             _headingLabel.AutoSize = true;
-            _headingLabel.Location = new Point(14, 12);
+            _headingLabel.Location = new Point(14, 18);
             body.Controls.Add(_headingLabel);
 
             _statusLabel = new Label();
@@ -130,7 +112,7 @@ namespace RDCheckerNativeUpdater
             _statusLabel.ForeColor = Color.FromArgb(58, 74, 98);
             _statusLabel.AutoSize = false;
             _statusLabel.Size = new Size(500, 22);
-            _statusLabel.Location = new Point(16, 56);
+            _statusLabel.Location = new Point(16, 70);
             body.Controls.Add(_statusLabel);
 
             _progressBar = new ProgressBar();
@@ -139,7 +121,7 @@ namespace RDCheckerNativeUpdater
             _progressBar.Minimum = 0;
             _progressBar.Maximum = 100;
             _progressBar.Size = new Size(522, 22);
-            _progressBar.Location = new Point(16, 86);
+            _progressBar.Location = new Point(16, 100);
             body.Controls.Add(_progressBar);
 
             _progressLabel = new Label();
@@ -149,43 +131,31 @@ namespace RDCheckerNativeUpdater
             _progressLabel.AutoSize = false;
             _progressLabel.TextAlign = ContentAlignment.MiddleRight;
             _progressLabel.Size = new Size(522, 18);
-            _progressLabel.Location = new Point(16, 112);
+            _progressLabel.Location = new Point(16, 126);
             body.Controls.Add(_progressLabel);
 
-            _stepCheck = BuildStepLabel("Check");
-            _stepCheck.Location = new Point(16, 138);
-            body.Controls.Add(_stepCheck);
-
-            _stepDownload = BuildStepLabel("Download");
-            _stepDownload.Location = new Point(194, 138);
-            body.Controls.Add(_stepDownload);
-
-            _stepInstall = BuildStepLabel("Install");
-            _stepInstall.Location = new Point(372, 138);
-            body.Controls.Add(_stepInstall);
-
             Label installedKey = BuildMetaKeyLabel("Installed");
-            installedKey.Location = new Point(16, 186);
+            installedKey.Location = new Point(16, 156);
             body.Controls.Add(installedKey);
 
             _installedValue = BuildMetaValueLabel(CurrentVersion);
-            _installedValue.Location = new Point(16, 206);
+            _installedValue.Location = new Point(16, 176);
             body.Controls.Add(_installedValue);
 
             Label latestKey = BuildMetaKeyLabel("Latest");
-            latestKey.Location = new Point(194, 186);
+            latestKey.Location = new Point(194, 156);
             body.Controls.Add(latestKey);
 
             _latestValue = BuildMetaValueLabel("-");
-            _latestValue.Location = new Point(194, 206);
+            _latestValue.Location = new Point(194, 176);
             body.Controls.Add(_latestValue);
 
             Label releaseKey = BuildMetaKeyLabel("Release Date");
-            releaseKey.Location = new Point(372, 186);
+            releaseKey.Location = new Point(372, 156);
             body.Controls.Add(releaseKey);
 
             _releaseValue = BuildMetaValueLabel("-");
-            _releaseValue.Location = new Point(372, 206);
+            _releaseValue.Location = new Point(372, 176);
             body.Controls.Add(_releaseValue);
 
             _actionButton = new Button();
@@ -197,23 +167,10 @@ namespace RDCheckerNativeUpdater
             _actionButton.ForeColor = Color.White;
             _actionButton.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
             _actionButton.Size = new Size(180, 36);
-            _actionButton.Location = new Point(358, 350);
+            _actionButton.Location = new Point(358, 320);
             _actionButton.Cursor = Cursors.Hand;
             _actionButton.Click += ActionButton_Click;
             body.Controls.Add(_actionButton);
-        }
-
-        private static Label BuildStepLabel(string text)
-        {
-            Label label = new Label();
-            label.Text = text;
-            label.TextAlign = ContentAlignment.MiddleCenter;
-            label.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
-            label.Size = new Size(166, 30);
-            label.BackColor = Color.FromArgb(246, 249, 253);
-            label.ForeColor = Color.FromArgb(103, 120, 143);
-            label.BorderStyle = BorderStyle.FixedSingle;
-            return label;
         }
 
         private static Label BuildMetaKeyLabel(string text)
@@ -254,8 +211,6 @@ namespace RDCheckerNativeUpdater
 
             try
             {
-                ResetStepState();
-                SetStepState(_stepCheck, "active");
                 SetStatus("Checking for update package...");
                 SetProgressMarquee("Checking");
 
@@ -271,35 +226,27 @@ namespace RDCheckerNativeUpdater
 
                 if (CompareVersions(package.Version, CurrentVersion) <= 0)
                 {
-                    SetStepState(_stepCheck, "done");
                     SetStatus("Already up to date. No action required.");
                     SetProgressValue(100, "Up to date");
                     _actionButton.Enabled = true;
-                    _actionButton.Text = "Finish";
+                    _actionButton.Text = "Close";
                     _isRunning = false;
                     return;
                 }
 
-                SetStepState(_stepCheck, "done");
-                SetStepState(_stepDownload, "active");
                 SetStatus("Downloading update file...");
                 string downloadedFile = await DownloadPackageAsync(package);
-                SetStepState(_stepDownload, "done");
 
-                SetStepState(_stepInstall, "active");
                 SetProgressMarquee("Installing");
                 await LaunchInstallerAsync(downloadedFile);
-                SetStepState(_stepInstall, "done");
 
                 SetStatus("Update downloaded and launched successfully.");
                 SetProgressValue(100, "Complete");
                 _actionButton.Enabled = true;
-                _actionButton.Text = "Finish";
+                _actionButton.Text = "Close";
             }
             catch (Exception ex)
             {
-                ResetStepState();
-                SetStepState(_stepCheck, "error");
                 SetStatus("Update failed: " + NormalizeErrorMessage(ex.Message), true);
                 SetProgressValue(0, "Failed");
                 _actionButton.Enabled = true;
@@ -562,45 +509,6 @@ namespace RDCheckerNativeUpdater
             _progressLabel.Text = title + " - " + safe.ToString(CultureInfo.InvariantCulture) + "%";
         }
 
-        private void ResetStepState()
-        {
-            SetStepState(_stepCheck, "pending");
-            SetStepState(_stepDownload, "pending");
-            SetStepState(_stepInstall, "pending");
-        }
-
-        private static void SetStepState(Label label, string state)
-        {
-            if (label == null)
-            {
-                return;
-            }
-
-            if (state == "active")
-            {
-                label.BackColor = Color.FromArgb(43, 124, 224);
-                label.ForeColor = Color.White;
-                return;
-            }
-
-            if (state == "done")
-            {
-                label.BackColor = Color.FromArgb(33, 138, 95);
-                label.ForeColor = Color.White;
-                return;
-            }
-
-            if (state == "error")
-            {
-                label.BackColor = Color.FromArgb(182, 58, 47);
-                label.ForeColor = Color.White;
-                return;
-            }
-
-            label.BackColor = Color.FromArgb(246, 249, 253);
-            label.ForeColor = Color.FromArgb(103, 120, 143);
-        }
-
         private void ActionButton_Click(object sender, EventArgs e)
         {
             if (_isRunning)
@@ -655,13 +563,42 @@ namespace RDCheckerNativeUpdater
                 return "-";
             }
 
-            DateTime parsed;
-            if (DateTime.TryParse(value, out parsed))
+            string trimmed = value.Trim();
+            if (Regex.IsMatch(trimmed, @"^\d{4}-\d{2}-\d{2}$"))
             {
-                return parsed.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+                return trimmed;
             }
 
-            return value;
+            DateTime parsed;
+            string[] exactFormats = new[]
+            {
+                "yyyy-MM-ddTHH:mm:ssZ",
+                "yyyy-MM-ddTHH:mm:ss.fffZ",
+                "yyyy-MM-ddTHH:mm:ssK",
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-dd"
+            };
+
+            if (DateTime.TryParseExact(
+                trimmed,
+                exactFormats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out parsed))
+            {
+                return parsed.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            }
+
+            if (DateTime.TryParse(
+                trimmed,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out parsed))
+            {
+                return parsed.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            }
+
+            return trimmed;
         }
 
         private static string NormalizeErrorMessage(string text)

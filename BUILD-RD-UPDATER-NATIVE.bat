@@ -19,9 +19,19 @@ if not exist "native-updater\Program.cs" (
   exit /b 1
 )
 
+set "ICON_PATH=native-updater\app-zoom.ico"
+if not exist "%ICON_PATH%" set "ICON_PATH=native-updater\app.ico"
+
+if not exist "%ICON_PATH%" (
+  echo ERROR: no icon file found. Checked native-updater\app-zoom.ico and native-updater\app.ico
+  pause
+  exit /b 1
+)
+
 echo Building RD-Checker-Updater-Setup.exe ...
 "%CSC%" /nologo /target:winexe /platform:x64 ^
   /out:"RD-Checker-Updater-Setup.exe" ^
+  /win32icon:"%ICON_PATH%" ^
   /reference:System.dll ^
   /reference:System.Core.dll ^
   /reference:System.Drawing.dll ^
