@@ -1,5 +1,9 @@
 # RD Checker Changelog
 
+## 1.1.11 - 2026-02-27
+- Merged pending working-tree updates into release.
+- Bumped extension/updater version to `1.1.11`.
+
 ## 1.1.10 - 2026-02-27
 - Version bump to `1.1.10`.
 - Kept updater full-folder sync behavior from GitHub `main`.
