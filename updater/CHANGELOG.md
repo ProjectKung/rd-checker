@@ -1,5 +1,10 @@
 # RD Checker Changelog
 
+## 1.1.4 - 2026-02-27
+- Added cache-busting query parameters for update checks and package downloads.
+- Added no-cache HTTP headers in updater WebClient to reduce stale CDN responses.
+- This makes clicking `RD-Checker-Updater-Setup.exe` pick up GitHub updates faster.
+
 ## 1.1.3 - 2026-02-27
 - Updated documentation to match current updater behavior.
 - Kept updater package as single fixed filename (`updater/RD-Checker-Updater-Setup.exe`).

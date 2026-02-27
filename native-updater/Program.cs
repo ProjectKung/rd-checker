@@ -165,7 +165,7 @@ namespace RDCheckerNativeUpdater
 
     internal sealed class UpdaterForm : Form
     {
-        private const string CurrentVersion = "1.1.3";
+        private const string CurrentVersion = "1.1.4";
         private const string ReleaseApiUrl = "https://api.github.com/repos/ProjectKung/rd-checker/releases/latest";
         private const string ManifestUrl = "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/update-manifest.json";
 
@@ -422,7 +422,8 @@ namespace RDCheckerNativeUpdater
         {
             try
             {
-                string json = await DownloadStringAsync(ReleaseApiUrl);
+                string json = await DownloadStringAsync(
+                    AddCacheBustingQuery(ReleaseApiUrl, DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture)));
                 JavaScriptSerializer serializer = new JavaScriptSerializer();
                 IDictionary<string, object> release = serializer.DeserializeObject(json) as IDictionary<string, object>;
                 if (release == null)
@@ -495,7 +496,10 @@ namespace RDCheckerNativeUpdater
 
         private async Task<UpdatePackage> TryResolveFromManifestAsync()
         {
-            string json = await DownloadStringAsync(ManifestUrl);
+            string manifestNoCacheUrl = AddCacheBustingQuery(
+                ManifestUrl,
+                DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
+            string json = await DownloadStringAsync(manifestNoCacheUrl);
             JavaScriptSerializer serializer = new JavaScriptSerializer();
             IDictionary<string, object> manifest = serializer.DeserializeObject(json) as IDictionary<string, object>;
             if (manifest == null)
@@ -575,7 +579,10 @@ namespace RDCheckerNativeUpdater
                     tcs.TrySetResult(true);
                 };
 
-                client.DownloadFileAsync(new Uri(package.DownloadUrl), targetPath);
+                string downloadUrl = AddCacheBustingQuery(
+                    package.DownloadUrl,
+                    package.Version + "-" + DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
+                client.DownloadFileAsync(new Uri(downloadUrl), targetPath);
                 await tcs.Task;
             }
 
@@ -667,10 +674,36 @@ namespace RDCheckerNativeUpdater
             }
         }
 
+        private static string AddCacheBustingQuery(string url, string cacheToken)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return url;
+            }
+
+            UriBuilder builder = new UriBuilder(url);
+            string query = builder.Query;
+            if (!string.IsNullOrWhiteSpace(query) && query.StartsWith("?", StringComparison.Ordinal))
+            {
+                query = query.Substring(1);
+            }
+
+            string token = string.IsNullOrWhiteSpace(cacheToken)
+                ? DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture)
+                : cacheToken;
+
+            string cacheQuery = "cb=" + Uri.EscapeDataString(token);
+            builder.Query = string.IsNullOrWhiteSpace(query) ? cacheQuery : query + "&" + cacheQuery;
+            return builder.Uri.ToString();
+        }
+
         private static WebClient CreateWebClient()
         {
             WebClient client = new WebClient();
             client.Headers["User-Agent"] = "RDCheckerNativeUpdater";
+            client.Headers[HttpRequestHeader.CacheControl] = "no-cache, no-store, must-revalidate";
+            client.Headers["Pragma"] = "no-cache";
+            client.Headers["Expires"] = "0";
             client.Encoding = System.Text.Encoding.UTF8;
             return client;
         }
