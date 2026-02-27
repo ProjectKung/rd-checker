@@ -3,6 +3,7 @@
 ## 1.1.2 - 2026-02-27
 - Test release to validate end-to-end self-update flow from `1.1.1`.
 - Kept auto-replace and restart behavior for updater executable packages.
+- Switched updater package to a single fixed filename: `RD-Checker-Updater-Setup.exe`.
 
 ## 1.1.1 - 2026-02-27
 - Updated updater executable icon to use the new design.

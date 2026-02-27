@@ -1,13 +1,13 @@
 {
   "version": "1.1.2",
   "release_date": "2026-02-27",
-  "package_name": "RD-Checker-Updater-Setup-1.1.2.exe",
-  "package_url": "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/RD-Checker-Updater-Setup-1.1.2.exe",
+  "package_name": "RD-Checker-Updater-Setup.exe",
+  "package_url": "https://raw.githubusercontent.com/ProjectKung/rd-checker/main/updater/RD-Checker-Updater-Setup.exe",
   "package_size": "auto",
   "notes": [
     "Test release 1.1.2 for self-update validation.",
     "Updater auto-replaces its own EXE and restarts automatically.",
-    "Fallback manifest now points directly to an executable package."
+    "Fallback manifest points to a single fixed executable package name."
   ]
 }
 

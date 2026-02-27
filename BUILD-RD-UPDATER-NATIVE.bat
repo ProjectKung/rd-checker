@@ -45,6 +45,10 @@ if errorlevel 1 (
   exit /b 1
 )
 
+if not exist "updater" mkdir "updater"
+copy /y "RD-Checker-Updater-Setup.exe" "updater\RD-Checker-Updater-Setup.exe" >nul
+del /q "updater\RD-Checker-Updater-Setup-*.exe" >nul 2>&1
+
 echo Build complete: %cd%\RD-Checker-Updater-Setup.exe
 start "" "%cd%"
 pause
