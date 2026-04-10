@@ -225,17 +225,52 @@
   function extractWorksheetSerialFromPdfText(text, fallbackSn) {
     const src = normalizeTextForLineScan(text || '').toUpperCase();
     const fallback = normalizeSerial(fallbackSn);
+    const serialLabelPattern = '(?:\\u0E2B\\u0E21\\u0E32\\u0E22\\u0E40\\u0E25\\u0E02\\u0E40\\u0E04\\u0E23\\u0E37\\u0E48\\u0E2D\\u0E07|SERIAL\\s*NO\\.?|SERIAL\\s*NUMBER|S\\/N|SN)';
+    const serialLabelRe = new RegExp(serialLabelPattern, 'i');
+    const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    function looksLikeWorksheetSerial(v) {
+      const s = normalizeSerial(v);
+      if (!s || !/^[A-Z0-9\-_]+$/.test(s) || /^RD\d{2}/.test(s)) return false;
+      if (looksLikeSerial(s)) return true;
+      // PM ใบงานบางงานใช้เลขเครื่องเป็นตัวเลขล้วนสั้นๆ เช่น 1403130
+      return /^\d{6,9}$/.test(s);
+    }
     if (fallback && isCableNetworkSerial(fallback)) return fallback;
-    const labeled = src.match(/(?:\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E25\u0E02\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07|SERIAL\s*NO\.?|SERIAL\s*NUMBER|S\/N|SN)\s*[:：]?\s*([A-Z0-9\-_]{6,})/i);
-    if (labeled && looksLikeSerial(labeled[1])) return normalizeSerial(labeled[1]);
-    const toks = src.match(/\b[A-Z0-9_][A-Z0-9\-_]{7,}\b/g) || [];
+
+    if (fallback) {
+      const nearLabelRe = new RegExp(`${serialLabelPattern}[\\s\\S]{0,120}${escapeRegex(fallback)}`, 'i');
+      if (nearLabelRe.test(src)) return fallback;
+    }
+
+    const labeled = src.match(new RegExp(`${serialLabelPattern}\\s*[:：]?\\s*([A-Z0-9\\-_]{4,})`, 'i'));
+    if (labeled && looksLikeWorksheetSerial(labeled[1])) return normalizeSerial(labeled[1]);
+
+    const labeledLines = src.split(/\r?\n+/).filter((line) => serialLabelRe.test(line));
+    for (const line of labeledLines) {
+      const lineToks = line.match(/\b[A-Z0-9_][A-Z0-9\-_]{3,}\b/g) || [];
+      for (const t of lineToks) {
+        const v = normalizeSerial(t);
+        if (fallback && v === fallback) return v;
+      }
+      for (const t of lineToks) {
+        const v = normalizeSerial(t);
+        if (looksLikeWorksheetSerial(v)) return v;
+      }
+    }
+
+    const toks = src.match(/\b[A-Z0-9_][A-Z0-9\-_]{3,}\b/g) || [];
     for (const t of toks) {
       const v = normalizeSerial(t);
-      if (looksLikeSerial(v) && (!fallback || v === fallback)) return v;
+      if (fallback && v === fallback) return v;
     }
     for (const t of toks) {
       const v = normalizeSerial(t);
-      if (looksLikeSerial(v)) return v;
+      if (!looksLikeWorksheetSerial(v)) continue;
+      // กันกรณีเผลอหยิบเบอร์โทรศัพท์ 10-11 หลักที่ขึ้นต้น 0
+      const digits = v.replace(/\D/g, '');
+      const hasAlpha = /[A-Z]/.test(v);
+      if (!hasAlpha && digits.length >= 10 && digits.length <= 11 && /^0/.test(digits)) continue;
+      return v;
     }
     return fallback || null;
   }
@@ -501,17 +536,25 @@
     const approveToSn = approveCurrentSn || approveFromSn || '';
     const rackBaseSnRaw = normalizeSerial(extracted.rackBaseSerial || '');
     const rackCurrentSnRaw = normalizeSerial(extracted.rackCurrentSerial || extracted.rackMatchedSerial || '');
-    const useApproveAsRack = !extracted.rackContainsTargetSn;
-    const rackBaseSn = useApproveAsRack ? (approveFromSn || rackBaseSnRaw || '') : (rackBaseSnRaw || approveFromSn || '');
-    const rackCurrentSn = useApproveAsRack ? (approveToSn || rackCurrentSnRaw || '') : rackCurrentSnRaw;
     const serialChanged = !!(approveFromSn && approveToSn && approveFromSn !== approveToSn);
-    const rackMatchedSerial = rackCurrentSn;
+    const rackBaseSn = rackBaseSnRaw || '';
+    const rackMatchedSerial = rackCurrentSnRaw || '';
+    const rackHasExplicitOldSerial = !!(rackBaseSnRaw && rackMatchedSerial && rackBaseSnRaw !== rackMatchedSerial);
     if (!pmSn) reasons.push('ไม่พบ S/N จาก pm_title');
     if (!approveToSn) reasons.push('ไม่พบ Serial No จาก pm_editcall_approve_device');
     if (!rackMatchedSerial) reasons.push('ไม่พบ S/N ในขั้นตอนที่ 3 (rack/map)');
-    if (pmSn && approveFromSn && pmSn !== approveFromSn) reasons.push('S/N หน้า pm_title ไม่ตรงกับเลขเก่าหน้า pm_editcall_approve_device');
-    if (pmSn && rackBaseSn && pmSn !== rackBaseSn) reasons.push('S/N หน้า pm_title ไม่ตรงกับเลขเก่าหน้า Rack Diagram');
-    if (approveToSn && rackMatchedSerial && approveToSn !== rackMatchedSerial) reasons.push('เลขที่เปลี่ยนของ pm_editcall_approve_device ไม่ตรงกับ Rack Diagram');
+    if (serialChanged) {
+      if (pmSn && approveFromSn && pmSn !== approveFromSn) reasons.push('S/N หน้า pm_title ไม่ตรงกับเลขเก่าหน้า pm_editcall_approve_device');
+      if (pmSn && rackHasExplicitOldSerial && pmSn !== rackBaseSnRaw) reasons.push('S/N หน้า pm_title ไม่ตรงกับเลขเก่าหน้า Rack Diagram');
+    } else {
+      if (pmSn && approveToSn && pmSn !== approveToSn) reasons.push('S/N หน้า pm_title ไม่ตรงกับ pm_editcall_approve_device');
+      if (pmSn && rackMatchedSerial && pmSn !== rackMatchedSerial) reasons.push('S/N หน้า pm_title ไม่ตรงกับ Rack Diagram');
+    }
+    if (approveToSn && rackMatchedSerial && approveToSn !== rackMatchedSerial) {
+      reasons.push(serialChanged
+        ? 'เลขที่เปลี่ยนของ pm_editcall_approve_device ไม่ตรงกับ Rack Diagram'
+        : 'S/N ของ pm_editcall_approve_device ไม่ตรงกับ Rack Diagram');
+    }
     if (Array.isArray(errors)) {
       for (const e of errors) {
         const msg = String(e || '');
@@ -530,7 +573,7 @@
     const approveDisplayText = (serialChanged)
       ? `${approveFromSn} เปลี่ยนเป็น ${approveToSn}`
       : (approveToSn || '-');
-    const rackFromSn = rackBaseSn || approveFromSn || pmSn || '';
+    const rackFromSn = rackBaseSn || '';
     const rackDisplayText = (rackFromSn && rackMatchedSerial && rackFromSn !== rackMatchedSerial)
       ? `${rackFromSn} เปลี่ยนเป็น ${rackMatchedSerial}`
       : (rackMatchedSerial || 'ไม่พบเลขเดียวกัน');

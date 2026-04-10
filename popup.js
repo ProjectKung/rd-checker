@@ -1950,6 +1950,104 @@
         }
       };
 
+      const looksLikePdfArrayBuffer = (arrayBuffer) => {
+        if (!arrayBuffer || arrayBuffer.byteLength < 4) return false;
+        const len = Math.min(arrayBuffer.byteLength, 1024);
+        const bytes = new Uint8Array(arrayBuffer, 0, len);
+        for (let i = 0; i <= len - 4; i++) {
+          if (
+            bytes[i] === 0x25 && // %
+            bytes[i + 1] === 0x50 && // P
+            bytes[i + 2] === 0x44 && // D
+            bytes[i + 3] === 0x46 // F
+          ) return true;
+        }
+        return false;
+      };
+
+      const decodeHtmlFromArrayBuffer = (arrayBuffer) => {
+        if (!arrayBuffer || arrayBuffer.byteLength < 2) return '';
+        const decodeWith = (enc) => {
+          try {
+            return new TextDecoder(enc, { fatal: false }).decode(arrayBuffer);
+          } catch (_) {
+            return '';
+          }
+        };
+        const utf8 = decodeWith('utf-8');
+        const htmlHintRe = /<(?:html|body|iframe|embed|object|a|center)\b/i;
+        if (htmlHintRe.test(utf8)) return utf8;
+        const win874 = decodeWith('windows-874');
+        if (htmlHintRe.test(win874)) return win874;
+        return utf8 || win874 || '';
+      };
+
+      const extractEmbeddedDocumentUrls = (html, baseUrl) => {
+        const out = [];
+        const seen = new Set();
+        const scoreOf = (u) => {
+          let s = 0;
+          if (/\.pdf(?:$|[?#])/i.test(u)) s += 100;
+          if (/view_ground\.php/i.test(u)) s += 80;
+          if (/pm_pic\d*\//i.test(u)) s += 60;
+          if (/upload\d+\//i.test(u)) s += 40;
+          if (/view_configuration\.php/i.test(u)) s += 20;
+          if (/\.php(?:$|[?#])/i.test(u)) s += 10;
+          return s;
+        };
+        const add = (raw) => {
+          const v = String(raw || '').trim();
+          if (!v) return;
+          if (/^(?:javascript:|data:|mailto:|#)/i.test(v)) return;
+          let abs = '';
+          try { abs = new URL(v, baseUrl).toString(); } catch (_) { return; }
+          if (seen.has(abs)) return;
+          seen.add(abs);
+          out.push({ url: abs, score: scoreOf(abs) });
+        };
+        try {
+          const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+          for (const el of Array.from(doc.querySelectorAll('iframe[src]'))) add(el.getAttribute('src'));
+          for (const el of Array.from(doc.querySelectorAll('embed[src]'))) add(el.getAttribute('src'));
+          for (const el of Array.from(doc.querySelectorAll('object[data]'))) add(el.getAttribute('data'));
+          for (const el of Array.from(doc.querySelectorAll('a[href]'))) add(el.getAttribute('href'));
+        } catch (_) {}
+
+        const absPdf = String(html || '').match(/https?:\/\/[^\s"'<>]+\.pdf[^\s"'<>]*/ig) || [];
+        for (const u of absPdf) add(u);
+
+        out.sort((a, b) => b.score - a.score);
+        return out.slice(0, 12).map((x) => x.url);
+      };
+
+      const tryParsePdfFromUrl = async (targetUrl, sourceLabel, visited, depth = 0) => {
+        if (!targetUrl) return null;
+        if (visited.has(targetUrl)) return null;
+        visited.add(targetUrl);
+        try {
+          const res = await fetchWithTimeout(targetUrl, fetchOpts, 25000);
+          const ct = String(res.headers.get('content-type') || '').toLowerCase();
+          const ab = await res.arrayBuffer();
+          const pdfByHeader = looksLikePdfArrayBuffer(ab);
+          if (ct.includes('application/pdf') || pdfByHeader) {
+            const parsed = await parsePdfTextResult(ab, sourceLabel);
+            if (parsed) return parsed;
+          }
+          if (depth >= 1) return null;
+
+          const nestedHtml = decodeHtmlFromArrayBuffer(ab);
+          if (!nestedHtml || nestedHtml.length < 20) return null;
+          const nestedUrls = extractEmbeddedDocumentUrls(nestedHtml, targetUrl);
+          for (const nested of nestedUrls) {
+            const parsed = await tryParsePdfFromUrl(nested, `${sourceLabel}_nested`, visited, depth + 1);
+            if (parsed) return parsed;
+          }
+        } catch (_) {
+          // ignore candidate failures and continue with next candidate
+        }
+        return null;
+      };
+
       const parsePdfTextResult = async (pdfArrayBuffer, sourceLabel) => {
         if (!pdfArrayBuffer || pdfArrayBuffer.byteLength <= 100) return null;
 
@@ -2040,57 +2138,32 @@
 
       try {
         const response = await fetchWithTimeout(url, fetchOpts, 25000);
-
         const contentType = (response.headers.get('content-type') || '').toLowerCase();
-        const isPdfUrl = /\.pdf(?:$|\?)/i.test(url);
+        const responseArrayBuffer = await response.arrayBuffer();
         const isPdfResponse = contentType.includes('application/pdf');
-        if (isPdfUrl || isPdfResponse) {
-          const pdfArrayBuffer = await response.arrayBuffer();
-          const directPdfResult = await parsePdfTextResult(pdfArrayBuffer, 'direct_pdf');
+        const directLooksPdf = looksLikePdfArrayBuffer(responseArrayBuffer);
+        if (isPdfResponse || directLooksPdf) {
+          const directPdfResult = await parsePdfTextResult(responseArrayBuffer, 'direct_pdf');
           if (directPdfResult) return directPdfResult;
         }
 
-        const html = await response.text();
+        const html = decodeHtmlFromArrayBuffer(responseArrayBuffer);
 
         if (html && html.length > 50) {
           console.log('HTML fetched, length:', html.length);
           console.log('HTML content:', html.substring(0, 500));
 
-          // Look for PDF in iframe - handle newlines with [\s\S]*?
-          const iframeMatch = html.match(/iframe[\s\S]*?src=['"]([^'"]*\.pdf[^'"]*)['"][\s\S]*?>/i);
-
-          if (iframeMatch && iframeMatch[1]) {
-            let pdfUrl = iframeMatch[1].trim();
-            console.log('Found PDF in iframe:', pdfUrl);
-
-            // Handle relative URLs
-            if (!pdfUrl.startsWith('http')) {
-              const baseUrl = new URL(url);
-              pdfUrl = baseUrl.protocol + '//' + baseUrl.host + '/upload68-1/' + pdfUrl;
-            }
-
-            console.log('Full PDF URL:', pdfUrl);
-
-            // Try to fetch the PDF
-            try {
-              const pdfResponse = await fetchWithTimeout(pdfUrl, {
-                method: 'GET',
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-                },
-                credentials: 'include'
-              }, 25000);
-
-              const pdfArrayBuffer = await pdfResponse.arrayBuffer();
-              console.log('PDF fetched, size:', pdfArrayBuffer.byteLength);
-
-              const iframePdfResult = await parsePdfTextResult(pdfArrayBuffer, 'iframe_pdf');
-              if (iframePdfResult) return iframePdfResult;
-            } catch (pdfError) {
-              console.log('Could not fetch PDF from iframe:', pdfError);
+          // Try embedded document targets (iframe/embed/object/link),
+          // including non-.pdf URLs that actually return PDF content.
+          const embeddedUrls = extractEmbeddedDocumentUrls(html, url);
+          if (embeddedUrls.length) {
+            const visited = new Set([url]);
+            for (const candidateUrl of embeddedUrls) {
+              const parsed = await tryParsePdfFromUrl(candidateUrl, 'embedded_pdf', visited, 0);
+              if (parsed) return parsed;
             }
           } else {
-            console.log('No iframe PDF found in HTML');
+            console.log('No embedded document URL found in HTML');
           }
 
           // Fallback: parse HTML for timestamps
@@ -6175,10 +6248,10 @@ async function runCompareForUrls(pdfUrl, webUrl, mode){
       function extractEmbeddedPdfUrlFromViewConfigHtml(html, baseUrl) {
         try{
           const doc = new DOMParser().parseFromString(html || '', 'text/html');
-          const iframe = doc.querySelector('iframe[src*=".pdf"]');
-          const embed = doc.querySelector('embed[src*=".pdf"]');
-          const obj = doc.querySelector('object[data*=".pdf"]');
-          const a = doc.querySelector('a[href*=".pdf"]');
+          const iframe = doc.querySelector('iframe[src*=".pdf"], iframe[src]');
+          const embed = doc.querySelector('embed[src*=".pdf"], embed[src]');
+          const obj = doc.querySelector('object[data*=".pdf"], object[data]');
+          const a = doc.querySelector('a[href*=".pdf"], a[href]');
           let raw = null;
 
           if (iframe) raw = iframe.getAttribute('src');
@@ -6197,6 +6270,10 @@ async function runCompareForUrls(pdfUrl, webUrl, mode){
           // fallback regex (relative)
           const rel = String(html || '').match(/\/[^\s"'<>]+\.pdf[^\s"'<>]*/i);
           if (rel && rel[0]) return new URL(rel[0], baseUrl).toString();
+
+          // generic fallback: first iframe src even if not ending with .pdf
+          const anyIframe = String(html || '').match(/<iframe[^>]*\s+src=['"]([^'"]+)['"][^>]*>/i);
+          if (anyIframe && anyIframe[1]) return new URL(anyIframe[1], baseUrl).toString();
         }catch(e){
           // ignore
         }
