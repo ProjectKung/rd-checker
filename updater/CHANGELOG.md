@@ -1,5 +1,10 @@
 # RD Checker Changelog
 
+## 1.2.2 - 2026-04-23
+- Bumped extension/updater version to `1.2.2`.
+- Updated CRC parser to accept both `show interface counter errors` and `show interface counters errors`.
+- Included current working-tree updates in this release push.
+
 ## 1.1.12 - 2026-02-27
 - Version bump to `1.1.12`.
 - Repository cleanup for non-runtime temporary artifacts.

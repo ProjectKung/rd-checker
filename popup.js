@@ -1,8 +1,9 @@
 ﻿  // ข้อความแสดงผล Interface counters เมื่อปกติ (ใช้ทั้งใน checkInterfaceCountersValues และ UI)
   const INTERFACE_COUNTERS_OK_MESSAGE = 'ปกติ (ทั้งหมด --)';
   const CLI_INTERFACE_COUNTERS_OK_MESSAGE = 'ปกติ (ทั้งหมด 0)';
-  // ✅ GUI: รองรับคำสั่ง 'show interface counters errors' แบบย่อ/ตัดคำ เช่น
+  // ✅ GUI: รองรับคำสั่ง 'show interface counter(s) error(s)' แบบย่อ/ตัดคำ เช่น
   // show interface counters errors
+  // show interface counter errors
   // sho interfac counter error
   // sh interf count err
   // sh inter coun er
@@ -347,12 +348,12 @@
     return results;
   }
 
-  // ค้นหา "show interface counters errors" (รองรับแบบติดกันหรือมีช่องว่างระหว่างคำ) เอาทั้งคู่
+  // ค้นหา "show interface counter(s) error(s)" (รองรับแบบย่อ/สะกดไม่เต็ม/ช่องว่าง)
   function searchShowInterfaceCountersErrors(text) {
     if (!text || typeof text !== 'string') return [];
     const results = [];
-    // show ตามด้วย interface counters errors (รองรับช่องว่าง/ขึ้นบรรทัดระหว่างคำ)
-    const re = /show\s+interface\s+counters\s+errors/gi;
+    // ใช้ pattern เดียวกับตัวเช็คจริง เพื่อให้ debug/result ตรงกัน (counter/counters รองรับทั้งคู่)
+    const re = new RegExp(GUI_INTERFACE_COUNTERS_CMD_RE.source, 'gi');
     let m;
     while ((m = re.exec(text)) !== null) {
       // หาเริ่มต้นบรรทัด (ย้อนไปถึง \n หรือต้นข้อความ)
@@ -375,14 +376,14 @@
       return { found: false, message: 'ไม่มีข้อมูล' };
     }
     const normalized = normalizeTextForLineScan(html);
-    const hasCmd = /show\s+interface\s+counters\s+errors/i.test(normalized);
+    const hasCmd = GUI_INTERFACE_COUNTERS_CMD_RE.test(normalized);
     if (!hasCmd) {
-      return { found: false, message: 'ไม่พบ show interface counters errors' };
+      return { found: false, message: 'ไม่พบ show interface counter(s) errors' };
     }
 
     // Only scan the actual command output blocks. This avoids false positives from running-config/description
     // text elsewhere in the PDF that may contain things like "Gi9/9 - 12) TO HQ ...".
-    const cmdRe = /show\s+interface\s+counters\s+errors/gi;
+    const cmdRe = new RegExp(GUI_INTERFACE_COUNTERS_CMD_RE.source, 'gi');
     const blocks = [];
     const maxBlockChars = 40000; // enough for all tables in one command output (PDF text may be a single long "line")
     let m;
@@ -1858,7 +1859,7 @@
       // Parse Software Version (Cisco): รองรับหลายรูปแบบ และกัน IP/เลขหัวข้อ
       let softwareVersion = extractCiscoSoftwareVersion(text) || null;
 
-      // Parse Interface counters: หา "show interface counters errors" หรือดูจาก interface list
+      // Parse Interface counters: หา "show interface counter(s) errors" หรือดูจาก interface list
       // ใช้ฟังก์ชัน checkInterfaceCountersValues เหมือน GUI
       const interfaceCountersCheck = checkCliInterfaceCounters(parseText);
       
@@ -4906,7 +4907,7 @@
           const showInterfaceMatches = searchShowInterfaceCountersErrors(data.html);
           debugInfo += `\n=== SHOW INTERFACE COUNTERS ERRORS SEARCH ===\n`;
           if (showInterfaceMatches.length === 0) {
-            debugInfo += `ไม่พบคำว่า "show interface counters errors"\n`;
+            debugInfo += `ไม่พบคำว่า "show interface counter(s) errors"\n`;
           } else {
             debugInfo += `พบ ${showInterfaceMatches.length} จุด (เอาทั้งคู่):\n\n`;
             showInterfaceMatches.forEach((r, i) => {
@@ -4950,7 +4951,7 @@
         } else {
           debugInfo += selectedMode === 'CLI'
             ? `ไม่พบคำสั่ง CRC (sh/sho/show ... | i/in/inc/incl/include CRC)\n`
-            : `ไม่พบข้อมูล show interface counters errors\n`;
+            : `ไม่พบข้อมูล show interface counter(s) errors\n`;
         }
       }
 
